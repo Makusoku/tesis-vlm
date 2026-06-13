@@ -1,23 +1,20 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import type { ScreenId } from "@/lib/types";
 import { expert } from "@/lib/mock-data";
 import { DatabaseIcon, LeafIcon, LogoutIcon, SidebarPinIcon } from "./icons";
 
-interface SidebarProps {
-  active: ScreenId;
-  onChange: (screen: ScreenId) => void;
-}
-
 const navItems = [
-  { id: "expert-judgment" as const, label: "Juicio experto", icon: LeafIcon },
-  { id: "dataset" as const, label: "Dataset", icon: DatabaseIcon },
+  { href: "/juicio-experto", label: "Juicio experto", icon: LeafIcon },
+  { href: "/dataset", label: "Dataset", icon: DatabaseIcon },
 ];
 
 const expertInitial = expert.name.trim().charAt(0).toUpperCase();
 
-export function Sidebar({ active, onChange }: SidebarProps) {
+export function Sidebar() {
+  const pathname = usePathname();
   const [isPinned, setIsPinned] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const isExpanded = isPinned || isHovered;
@@ -74,18 +71,17 @@ export function Sidebar({ active, onChange }: SidebarProps) {
       <nav className="flex w-72 gap-2 overflow-x-auto lg:flex-col lg:overflow-visible">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const selected = active === item.id;
+          const selected = pathname === item.href;
           return (
-            <button
-              key={item.id}
-              onClick={() => onChange(item.id)}
+            <Link
+              key={item.href}
+              href={item.href}
               className={`grid h-14 shrink-0 grid-cols-[3rem_1fr] items-center overflow-hidden rounded-2xl px-0 text-sm transition-all duration-300 ease-out ${
                 isExpanded ? "w-72" : "w-12"
               } ${
                 selected ? "bg-emerald-400 font-semibold text-emerald-950" : "text-white/80 hover:bg-white/10"
               }`}
               title={item.label}
-              type="button"
             >
               <span className="flex h-12 w-12 items-center justify-center">
                 <Icon className="h-5 w-5 shrink-0" />
@@ -93,7 +89,7 @@ export function Sidebar({ active, onChange }: SidebarProps) {
               <span className="whitespace-nowrap text-left">
                 {item.label}
               </span>
-            </button>
+            </Link>
           );
         })}
       </nav>
