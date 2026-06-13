@@ -73,6 +73,8 @@ Reglas:
 
 Trabaja dentro de `frontend/`.
 
+Antes de modificar interfaz, layout, componentes visuales o flujos de usuario, lee y respeta `DESIGN.md`.
+
 Comandos principales:
 
 ```bash
