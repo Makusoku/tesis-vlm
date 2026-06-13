@@ -122,6 +122,17 @@ export function TrophyIcon(props: IconProps) {
   );
 }
 
+export function PinIcon(props: IconProps) {
+  return (
+    <IconBase title="Fijar" {...props}>
+      <path d="M15 4 20 9" />
+      <path d="M14 10 4 20" />
+      <path d="m14 10-4-4 4-4 8 8-4 4-4-4Z" />
+      <path d="M9 15 4 20" />
+    </IconBase>
+  );
+}
+
 export function ArrowRightIcon(props: IconProps) {
   return (
     <IconBase title="Siguiente" {...props}>

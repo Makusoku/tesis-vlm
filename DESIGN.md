@@ -49,6 +49,12 @@ La tabla o listado debe priorizar trazabilidad: imagen, diagnostico, metadatos, 
 ## Layout
 
 - Usar sidebar persistente en desktop.
+- El sidebar debe estar colapsado por defecto en desktop, mostrando solo iconos.
+- Al pasar el raton o enfocar el sidebar, debe expandirse para mostrar textos y contexto.
+- Debe existir una accion superior de fijado para mantener el sidebar extendido mientras este activa.
+- Los iconos principales del sidebar deben conservar su posicion al expandir o contraer.
+- Hacer click en una opcion de navegacion no debe fijar el sidebar.
+- El perfil del experto debe ubicarse en la parte inferior para no desplazar la navegacion principal.
 - En mobile/tablet, el sidebar puede apilarse arriba o transformarse en navegacion compacta.
 - El contenido principal debe tener padding consistente.
 - Usar grillas de 12 columnas en desktop cuando haya panel de imagen + panel de formulario.
