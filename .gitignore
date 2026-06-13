@@ -1,0 +1,15 @@
+node_modules
+.next
+out
+dist
+build
+.env
+.env.local
+.env.*.local
+backend/.venv
+backend/uploads
+backend/processed
+__pycache__
+*.pyc
+tsconfig.tsbuildinfo
+.DS_Store
