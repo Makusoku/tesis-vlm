@@ -49,9 +49,10 @@ La tabla o listado debe priorizar trazabilidad: imagen, diagnostico, metadatos, 
 ## Layout
 
 - Usar sidebar persistente en desktop.
+- La identidad superior del sidebar debe mostrar solo el nombre de la pagina/proyecto; no usar subtitulo en ese bloque.
 - El sidebar debe estar colapsado por defecto en desktop, mostrando solo iconos.
 - Al pasar el raton o enfocar el sidebar, debe expandirse para mostrar textos y contexto.
-- Debe existir una accion superior de fijado para mantener el sidebar extendido mientras este activa.
+- Debe existir una accion superior de fijado para mantener el sidebar extendido mientras este activa; debe usar un icono descriptivo de barra lateral y conservar tooltip/label accesible.
 - Los iconos principales del sidebar deben conservar su posicion al expandir o contraer.
 - Los textos de navegacion deben quedar en una posicion fija y revelarse por el recorte del sidebar, sin aparecer tarde por fade o cambio de posicion.
 - Al contraerse, el borde derecho del sidebar debe actuar como mascara visual para que no se filtren letras de las etiquetas.
@@ -60,6 +61,8 @@ La tabla o listado debe priorizar trazabilidad: imagen, diagnostico, metadatos, 
 - Hacer click en una opcion de navegacion no debe fijar el sidebar.
 - El perfil del experto debe ubicarse en la parte inferior para no desplazar la navegacion principal.
 - Por ahora, el footer del sidebar solo debe mostrar un avatar cuadrado con inicial unica, nombre y rol corto; no mostrar XP, porcentaje ni mision semanal.
+- El footer puede mostrar accion de cerrar sesion junto al usuario, pero solo cuando el sidebar este expandido.
+- El sidebar expandido debe dar espacio suficiente para leer completo el nombre del usuario del footer.
 - La navegacion principal del sidebar debe estar anclada a una posicion vertical estable.
 - En desktop, el sidebar debe medir lo mismo que la ventana y no debe scrollear con el contenido principal.
 - El scroll vertical de la aplicacion debe ocurrir en el panel de contenido, no en la barra lateral.

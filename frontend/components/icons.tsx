@@ -101,6 +101,16 @@ export function UserIcon(props: IconProps) {
   );
 }
 
+export function LogoutIcon(props: IconProps) {
+  return (
+    <IconBase title="Cerrar sesion" {...props}>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="M16 17l5-5-5-5" />
+      <path d="M21 12H9" />
+    </IconBase>
+  );
+}
+
 export function SearchIcon(props: IconProps) {
   return (
     <IconBase title="Buscar" {...props}>
@@ -129,6 +139,17 @@ export function PinIcon(props: IconProps) {
       <path d="M14 10 4 20" />
       <path d="m14 10-4-4 4-4 8 8-4 4-4-4Z" />
       <path d="M9 15 4 20" />
+    </IconBase>
+  );
+}
+
+export function SidebarPinIcon(props: IconProps) {
+  return (
+    <IconBase title="Fijar barra lateral" {...props}>
+      <rect x="3" y="4" width="18" height="16" rx="3" />
+      <path d="M8 4v16" />
+      <path d="M13 10h4" />
+      <path d="M15 8v6" />
     </IconBase>
   );
 }
