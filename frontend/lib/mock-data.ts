@@ -10,8 +10,8 @@ import type {
 
 export const expert: Expert = {
   id: "exp-001",
-  name: "Experto validador",
-  role: "Analista Agronomico",
+  name: "Marcos Frisancho",
+  role: "Lic.",
   level: 3,
   xp: 680,
   nextLevelXp: 1000,

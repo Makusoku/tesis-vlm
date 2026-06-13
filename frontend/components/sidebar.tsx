@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { ScreenId } from "@/lib/types";
 import { expert } from "@/lib/mock-data";
-import { DatabaseIcon, LeafIcon, PinIcon, TrophyIcon } from "./icons";
+import { DatabaseIcon, LeafIcon, PinIcon } from "./icons";
 
 interface SidebarProps {
   active: ScreenId;
@@ -15,10 +15,11 @@ const navItems = [
   { id: "dataset" as const, label: "Dataset", icon: DatabaseIcon },
 ];
 
+const expertInitial = expert.name.trim().charAt(0).toUpperCase();
+
 export function Sidebar({ active, onChange }: SidebarProps) {
   const [isPinned, setIsPinned] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const progress = Math.round((expert.xp / expert.nextLevelXp) * 100);
   const isExpanded = isPinned || isHovered;
 
   useEffect(() => {
@@ -35,36 +36,33 @@ export function Sidebar({ active, onChange }: SidebarProps) {
 
   return (
     <aside
-      className={`flex w-full flex-col gap-4 bg-canopy-900 p-4 text-white transition-all duration-300 ease-out lg:sticky lg:top-0 lg:min-h-screen lg:shrink-0 ${
+      className={`relative flex w-full flex-col gap-3 overflow-hidden bg-canopy-900 p-4 text-white transition-all duration-300 ease-out lg:sticky lg:top-0 lg:h-screen lg:shrink-0 ${
         isExpanded ? "lg:w-72" : "lg:w-20"
       }`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div
-        className={`grid gap-3 ${isExpanded ? "grid-cols-[3rem_1fr_auto] items-center" : "grid-cols-[3rem] justify-center"}`}
-      >
-        <div className="flex h-12 w-12 min-w-0 items-center justify-center">
+      <div className="relative h-14 w-64 shrink-0">
+        <div className="absolute left-0 top-0 flex h-12 w-12 min-w-0 items-center justify-center">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-400/20">
             <LeafIcon className="h-7 w-7 text-emerald-300" />
           </div>
         </div>
         <div
-          className={`min-w-0 overflow-hidden transition-all duration-200 ${
-            isExpanded ? "max-w-44 opacity-100" : "max-w-0 opacity-0 lg:pointer-events-none"
-          }`}
+          className="absolute left-16 right-14 top-1 min-w-0 overflow-hidden"
         >
-          <h1 className="whitespace-nowrap text-xl font-bold leading-tight">AgroCafeLLM</h1>
-          <p className="whitespace-nowrap text-xs text-emerald-100/70">Curacion experta multimodal</p>
+          <h1 className="truncate text-xl font-bold leading-tight">AgroCafeLLM</h1>
+          <p className="truncate text-xs text-emerald-100/70">Curacion experta multimodal</p>
         </div>
 
         <button
           aria-label={isPinned ? "Desfijar sidebar" : "Fijar sidebar"}
           aria-pressed={isPinned}
-          className={`${isExpanded ? "flex" : "hidden"} h-10 w-10 shrink-0 items-center justify-center rounded-xl transition ${
+          className={`absolute right-0 top-0 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition ${
             isPinned ? "bg-emerald-400 text-emerald-950" : "bg-white/10 text-white/80 hover:bg-white/15"
           }`}
           onClick={togglePinned}
+          tabIndex={isExpanded ? 0 : -1}
           title={isPinned ? "Desfijar sidebar" : "Fijar sidebar"}
           type="button"
         >
@@ -72,7 +70,9 @@ export function Sidebar({ active, onChange }: SidebarProps) {
         </button>
       </div>
 
-      <nav className="flex gap-2 overflow-x-auto lg:flex-col lg:overflow-visible">
+      <div className="h-px w-full bg-white/10" />
+
+      <nav className="flex w-64 gap-2 overflow-x-auto lg:flex-col lg:overflow-visible">
         {navItems.map((item) => {
           const Icon = item.icon;
           const selected = active === item.id;
@@ -80,7 +80,9 @@ export function Sidebar({ active, onChange }: SidebarProps) {
             <button
               key={item.id}
               onClick={() => onChange(item.id)}
-              className={`grid h-14 shrink-0 grid-cols-[3rem_1fr] items-center rounded-2xl px-0 text-sm transition lg:w-full ${
+              className={`grid h-14 shrink-0 grid-cols-[3rem_1fr] items-center overflow-hidden rounded-2xl px-0 text-sm transition-all duration-300 ease-out ${
+                isExpanded ? "w-64" : "w-12"
+              } ${
                 selected ? "bg-emerald-400 font-semibold text-emerald-950" : "text-white/80 hover:bg-white/10"
               }`}
               title={item.label}
@@ -89,11 +91,7 @@ export function Sidebar({ active, onChange }: SidebarProps) {
               <span className="flex h-12 w-12 items-center justify-center">
                 <Icon className="h-5 w-5 shrink-0" />
               </span>
-              <span
-                className={`whitespace-nowrap transition-all duration-200 ${
-                  isExpanded ? "max-w-40 opacity-100" : "max-w-0 overflow-hidden opacity-0 lg:pointer-events-none"
-                }`}
-              >
+              <span className="whitespace-nowrap text-left">
                 {item.label}
               </span>
             </button>
@@ -101,40 +99,22 @@ export function Sidebar({ active, onChange }: SidebarProps) {
         })}
       </nav>
 
-      <div className="mt-auto space-y-3">
+      <div className="mt-auto lg:absolute lg:bottom-4 lg:left-3">
         <div
-          className={`overflow-hidden rounded-2xl border border-white/10 bg-white/10 transition-all duration-200 ${
-            isExpanded ? "max-h-40 p-4 opacity-100" : "max-h-0 border-transparent p-0 opacity-0 lg:pointer-events-none"
+          className={`relative h-14 overflow-hidden rounded-2xl border border-white/10 bg-white/10 transition-all duration-300 ease-out ${
+            isExpanded ? "w-64" : "w-14"
           }`}
         >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-200 font-bold text-emerald-950">EV</div>
-            <div className="min-w-0">
-              <p className="whitespace-nowrap text-sm font-semibold">{expert.name}</p>
-              <p className="whitespace-nowrap text-xs text-white/60">Nivel {expert.level} · {expert.role}</p>
-            </div>
+          <span className="absolute left-0 top-0 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-400 text-2xl font-semibold leading-none text-emerald-950">
+            {expertInitial}
+          </span>
+          <div
+            className="absolute left-[4.5rem] right-4 top-1/2 min-w-0 -translate-y-1/2"
+          >
+            <p className="truncate text-base font-bold leading-tight">{expert.name}</p>
+            <p className="truncate text-sm font-semibold leading-tight text-white/60">{expert.role}</p>
           </div>
-          <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
-            <div className="h-full rounded-full bg-emerald-300" style={{ width: `${progress}%` }} />
-          </div>
-          <p className="mt-2 whitespace-nowrap text-xs text-white/60">{expert.xp} / {expert.nextLevelXp} XP para el siguiente nivel</p>
         </div>
-
-      <div
-        className={`rounded-2xl bg-amber-300 text-amber-950 transition-all duration-200 ${
-          isExpanded ? "max-h-40 p-4 opacity-100" : "max-h-0 overflow-hidden p-0 opacity-0 lg:pointer-events-none"
-        }`}
-      >
-        <div className="flex items-center gap-2 font-bold">
-          <TrophyIcon className="h-5 w-5 shrink-0" />
-          <span className="whitespace-nowrap">Mision semanal</span>
-        </div>
-        <p className="mt-2 text-xs">Validar 30 hojas con razonamiento experto y diagnostico diferencial.</p>
-        <div className="mt-3 flex justify-between text-xs font-semibold">
-          <span>18 / 30</span>
-          <span>+120 XP</span>
-        </div>
-      </div>
       </div>
     </aside>
   );
