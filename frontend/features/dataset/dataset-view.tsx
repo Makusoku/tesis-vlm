@@ -9,12 +9,12 @@ const jsonlExample = {
   messages: [
     {
       role: "user",
-      content: "Que deficiencia nutricional presenta esta hoja de cafe?",
+      content: "¿Qué deficiencia nutricional presenta esta hoja de café?",
     },
     {
       role: "assistant",
       content:
-        "Presenta sintomas compatibles con deficiencia de magnesio: clorosis intervenal en hojas adultas, nervaduras parcialmente verdes y severidad moderada.",
+        "Presenta síntomas compatibles con deficiencia de magnesio: clorosis intervenal en hojas adultas, nervaduras parcialmente verdes y severidad moderada.",
     },
   ],
   metadata: {
@@ -32,7 +32,7 @@ export function DatasetView() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={ImageIcon} label="Imagenes cargadas" value="1,248" sub="327 pendientes" />
+        <StatCard icon={ImageIcon} label="Imágenes cargadas" value="1,248" sub="327 pendientes" />
         <StatCard icon={UserIcon} label="Expertos activos" value="24" sub="8 esta semana" />
         <StatCard icon={CheckIcon} label="Registros validados" value="812" sub={`${readyRecords} listos en muestra mock`} />
         <StatCard icon={AlertIcon} label="Casos conflictivos" value="93" sub="Requieren consenso" />
@@ -43,8 +43,8 @@ export function DatasetView() {
           <CardContent className="p-6">
             <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h3 className="text-xl font-bold text-slate-950">Exportacion para entrenamiento</h3>
-                <p className="text-sm text-slate-500">Registros multimodales derivados de anotacion semantica experta.</p>
+                <h3 className="text-xl font-bold text-slate-950">Exportación para entrenamiento</h3>
+                <p className="text-sm text-slate-500">Registros multimodales derivados de anotación semántica experta.</p>
               </div>
               <span className="w-fit rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
                 PostgreSQL como fuente de verdad
@@ -83,16 +83,16 @@ export function DatasetView() {
         <CardContent className="p-6">
           <div className="mb-5 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
-              <h3 className="text-xl font-bold text-slate-950">Banco curado de imagenes foliares</h3>
-              <p className="text-sm text-slate-500">Trazabilidad entre imagen depurada, metadatos clinicos y juicio experto.</p>
+              <h3 className="text-xl font-bold text-slate-950">Banco curado de imágenes foliares</h3>
+              <p className="text-sm text-slate-500">Trazabilidad entre imagen depurada, metadatos clínicos y juicio experto.</p>
             </div>
-            <Button variant="outline">Ver auditoria</Button>
+            <Button variant="outline">Ver auditoría</Button>
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-slate-200">
             <div className="hidden grid-cols-[1.2fr_1fr_1fr_1fr_0.8fr] gap-4 bg-slate-50 px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-500 lg:grid">
               <span>Imagen</span>
-              <span>Diagnostico</span>
+              <span>Diagnóstico</span>
               <span>Metadatos</span>
               <span>Consenso</span>
               <span>Estado</span>
@@ -126,7 +126,7 @@ export function DatasetView() {
                       record.exportReady ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
                     }`}
                   >
-                    {record.exportReady ? "Listo" : "Revision"}
+                    {record.exportReady ? "Listo" : "Revisión"}
                   </span>
                 </div>
               </div>

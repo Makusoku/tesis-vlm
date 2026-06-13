@@ -5,8 +5,8 @@ export function AppHeader() {
   return (
     <header className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
       <div>
-        <p className="text-sm font-semibold text-emerald-700">Plataforma de recoleccion de conocimiento experto</p>
-        <h2 className="text-2xl font-bold text-slate-950 md:text-3xl">Diagnostico nutricional en hojas de cafe</h2>
+        <p className="text-sm font-semibold text-emerald-700">Plataforma de recolección de conocimiento experto</p>
+        <h2 className="text-2xl font-bold text-slate-950 md:text-3xl">Diagnóstico nutricional en hojas de café</h2>
       </div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative">

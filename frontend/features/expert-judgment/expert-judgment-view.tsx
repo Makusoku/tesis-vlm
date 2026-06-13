@@ -21,7 +21,7 @@ export function ExpertJudgmentView() {
     "Nervaduras verdes",
   ]);
   const [description, setDescription] = useState(
-    "El patron de clorosis intervenal en hojas adultas sugiere deficiencia de magnesio. Las nervaduras permanecen relativamente verdes, diferenciandose de un amarillamiento generalizado por nitrogeno."
+    "El patrón de clorosis intervenal en hojas adultas sugiere deficiencia de magnesio. Las nervaduras permanecen relativamente verdes, diferenciándose de un amarillamiento generalizado por nitrógeno."
   );
 
   function toggleSymptom(symptom: string) {
@@ -49,7 +49,7 @@ export function ExpertJudgmentView() {
 
             <div className="relative bg-slate-100 p-5">
               <div className="relative h-[420px] overflow-hidden rounded-2xl shadow-inner md:h-[560px]">
-                <Image src={leafImage.url} alt="Hoja de cafe para anotacion experta" fill className="object-cover" priority />
+                <Image src={leafImage.url} alt="Hoja de café para anotación experta" fill className="object-cover" priority />
               </div>
               <div className="absolute left-8 top-8 max-w-xs rounded-2xl bg-white/90 p-3 shadow-md backdrop-blur">
                 <p className="flex items-center gap-2 text-xs font-bold text-slate-950">
@@ -57,7 +57,7 @@ export function ExpertJudgmentView() {
                   Zona visible sugerida
                 </p>
                 <p className="mt-1 text-xs text-slate-600">
-                  Registre sintomas y ubique si la afectacion aparece en bordes, nervaduras o lamina foliar.
+                  Registre síntomas y ubique si la afectación aparece en bordes, nervaduras o lámina foliar.
                 </p>
               </div>
               <div className="absolute bottom-8 right-8 hidden gap-2 md:flex">
@@ -129,7 +129,7 @@ export function ExpertJudgmentView() {
 
         <Card>
           <CardContent className="p-5">
-            <h3 className="mb-3 text-lg font-bold text-slate-950">Sintomas visibles</h3>
+            <h3 className="mb-3 text-lg font-bold text-slate-950">Síntomas visibles</h3>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {symptomCatalog.map((symptom) => (
                 <label key={symptom} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2 text-xs">
@@ -148,7 +148,7 @@ export function ExpertJudgmentView() {
 
         <Card>
           <CardContent className="p-5">
-            <h3 className="mb-3 text-lg font-bold text-slate-950">Descripcion clinica del experto</h3>
+            <h3 className="mb-3 text-lg font-bold text-slate-950">Descripción clínica del experto</h3>
             <textarea
               className="h-28 w-full resize-none rounded-2xl border border-slate-200 p-3 text-sm outline-none transition focus:border-emerald-500"
               value={description}
@@ -156,7 +156,7 @@ export function ExpertJudgmentView() {
             />
             <div className="mt-4 rounded-2xl bg-canopy-50 p-3 text-xs text-slate-600">
               <b className="text-slate-950">Registro actual:</b> {selectedDeficiency}, severidad {severity.toLowerCase()},
-              imagen de calidad {quality.toLowerCase()}, {selectedSymptoms.length} sintomas marcados.
+              imagen de calidad {quality.toLowerCase()}, {selectedSymptoms.length} síntomas marcados.
             </div>
             <Button className="mt-4 w-full">
               Guardar juicio y siguiente

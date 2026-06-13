@@ -109,17 +109,17 @@ export function Sidebar() {
             <p className="truncate text-base font-bold leading-tight">{expert.name}</p>
             <p className="truncate text-sm font-semibold leading-tight text-white/60">{expert.role}</p>
           </div>
-          <button
-            aria-label="Cerrar sesion"
+          <Link
+            aria-label="Cerrar sesión"
             className={`absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl text-white/80 transition hover:bg-white/10 hover:text-white ${
               isExpanded ? "opacity-100" : "pointer-events-none opacity-0"
             }`}
+            href="/login"
             tabIndex={isExpanded ? 0 : -1}
-            title="Cerrar sesion"
-            type="button"
+            title="Cerrar sesión"
           >
             <LogoutIcon className="h-6 w-6" />
-          </button>
+          </Link>
         </div>
       </div>
     </aside>

@@ -1,8 +1,8 @@
 export type ScreenId = "expert-judgment" | "dataset";
 
 export type Deficiency =
-  | "Nitrogeno (N)"
-  | "Fosforo (P)"
+  | "Nitrógeno (N)"
+  | "Fósforo (P)"
   | "Potasio (K)"
   | "Magnesio (Mg)"
   | "Hierro (Fe)"

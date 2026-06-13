@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "AgroCafeLLM",
-  description: "Plataforma de anotacion experta para imagenes foliares de cafe.",
+  description: "Plataforma de anotación experta para imágenes foliares de café.",
 };
 
 export default function RootLayout({

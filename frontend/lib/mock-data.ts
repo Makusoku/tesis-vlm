@@ -18,8 +18,8 @@ export const expert: Expert = {
 };
 
 export const deficiencies: Deficiency[] = [
-  "Nitrogeno (N)",
-  "Fosforo (P)",
+  "Nitrógeno (N)",
+  "Fósforo (P)",
   "Potasio (K)",
   "Magnesio (Mg)",
   "Hierro (Fe)",
@@ -35,7 +35,7 @@ export const symptomCatalog = [
   "Necrosis marginal",
   "Manchas oscuras",
   "Bordes quemados",
-  "Deformacion foliar",
+  "Deformación foliar",
   "Moteado irregular",
 ];
 
@@ -52,7 +52,7 @@ export const leafImage: LeafImage = {
 };
 
 export const clinicalMetadata: ClinicalMetadata = {
-  region: "Villa Rica, Peru",
+  region: "Villa Rica, Perú",
   farm: "Parcela demostrativa",
   variety: "Caturra",
   captureDate: "2026-05-28",
@@ -68,7 +68,7 @@ export const currentAnnotation: ExpertAnnotation = {
   confidence: 82,
   symptoms: clinicalMetadata.symptoms,
   clinicalDescription:
-    "El patron de clorosis intervenal en hojas adultas sugiere deficiencia de magnesio. Las nervaduras permanecen relativamente verdes, diferenciandose de un amarillamiento generalizado por nitrogeno.",
+    "El patrón de clorosis intervenal en hojas adultas sugiere deficiencia de magnesio. Las nervaduras permanecen relativamente verdes, diferenciándose de un amarillamiento generalizado por nitrógeno.",
   consensus: 0.86,
   expertValidated: true,
 };
@@ -94,7 +94,7 @@ export const datasetRecords: DatasetRecord[] = [
     },
     metadata: {
       ...clinicalMetadata,
-      region: "Chanchamayo, Peru",
+      region: "Chanchamayo, Perú",
       variety: "Bourbon",
       symptoms: ["Necrosis marginal", "Bordes quemados"],
     },
@@ -121,9 +121,9 @@ export const datasetRecords: DatasetRecord[] = [
     },
     metadata: {
       ...clinicalMetadata,
-      region: "Satipo, Peru",
+      region: "Satipo, Perú",
       farm: "Lote experimental norte",
-      symptoms: ["Moteado irregular", "Deformacion foliar"],
+      symptoms: ["Moteado irregular", "Deformación foliar"],
     },
     annotation: {
       ...currentAnnotation,
@@ -141,25 +141,25 @@ export const exportFormats: DatasetExportFormat[] = [
   {
     id: "jsonl",
     name: "JSONL para fine-tuning",
-    description: "Mensajes multimodales con trazabilidad, diagnostico y consenso.",
+    description: "Mensajes multimodales con trazabilidad, diagnóstico y consenso.",
     recordCount: 812,
   },
   {
     id: "llava",
     name: "Formato LLaVA multimodal",
-    description: "Referencia de imagen, prompt clinico y respuesta validada.",
+    description: "Referencia de imagen, prompt clínico y respuesta validada.",
     recordCount: 640,
   },
   {
     id: "csv",
-    name: "CSV estadistico",
-    description: "Variables tabulares para analisis descriptivo y control de calidad.",
+    name: "CSV estadístico",
+    description: "Variables tabulares para análisis descriptivo y control de calidad.",
     recordCount: 1248,
   },
   {
     id: "json",
     name: "JSON completo",
-    description: "Registro integral con metadatos, sintomas y experto responsable.",
+    description: "Registro integral con metadatos, síntomas y experto responsable.",
     recordCount: 812,
   },
 ];

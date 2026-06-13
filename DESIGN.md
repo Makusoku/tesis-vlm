@@ -48,7 +48,9 @@ La tabla o listado debe priorizar trazabilidad: imagen, diagnostico, metadatos, 
 
 ## Layout
 
-- Las vistas principales deben usar rutas reales de Next.js: `/juicio-experto` para anotacion experta y `/dataset` para dataset curado.
+- Las vistas principales deben usar rutas reales de Next.js: `/login` para inicio de sesion, `/juicio-experto` para anotacion experta y `/dataset` para dataset curado.
+- La pagina `/login` no debe mostrar sidebar; debe incluir acceso con correo y una opcion visible para continuar con Google.
+- El campo de contrasena del login debe incluir accion de mostrar/ocultar con icono de ojo.
 - Usar sidebar persistente en desktop.
 - La identidad superior del sidebar debe mostrar solo el nombre de la pagina/proyecto; no usar subtitulo en ese bloque.
 - El sidebar debe estar colapsado por defecto en desktop, mostrando solo iconos.
