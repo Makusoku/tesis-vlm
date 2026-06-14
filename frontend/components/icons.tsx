@@ -163,6 +163,25 @@ export function SearchIcon(props: IconProps) {
   );
 }
 
+export function MenuIcon(props: IconProps) {
+  return (
+    <IconBase title="Abrir menú" {...props}>
+      <path d="M4 6h16" />
+      <path d="M4 12h16" />
+      <path d="M4 18h16" />
+    </IconBase>
+  );
+}
+
+export function XIcon(props: IconProps) {
+  return (
+    <IconBase title="Cerrar menú" {...props}>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </IconBase>
+  );
+}
+
 export function TrophyIcon(props: IconProps) {
   return (
     <IconBase title="Trofeo" {...props}>

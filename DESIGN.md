@@ -69,7 +69,7 @@ La tabla o listado debe priorizar trazabilidad: imagen, diagnostico, metadatos, 
 - La navegacion principal del sidebar debe estar anclada a una posicion vertical estable.
 - En desktop, el sidebar debe medir lo mismo que la ventana y no debe scrollear con el contenido principal.
 - El scroll vertical de la aplicacion debe ocurrir en el panel de contenido, no en la barra lateral.
-- En mobile/tablet, el sidebar puede apilarse arriba o transformarse en navegacion compacta.
+- En mobile/tablet, no apilar el sidebar completo arriba: mostrar solo una barra superior compacta con logo e icono de menu. Al tocar el menu, abrir un drawer lateral superpuesto que cubra gran parte de la pantalla, con navegacion vertical y sin scroll horizontal.
 - El contenido principal debe tener padding consistente.
 - Usar grillas de 12 columnas en desktop cuando haya panel de imagen + panel de formulario.
 - Evitar tarjetas anidadas innecesarias.
