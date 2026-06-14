@@ -9,8 +9,8 @@ class Settings(BaseSettings):
     supabase_url: str | None = None
     supabase_service_role_key: str | None = None
     supabase_storage_bucket: str = "leaf-images"
-    upload_dir: str = "backend/uploads"
-    processed_dir: str = "backend/processed"
+    upload_dir: str = "uploads"
+    processed_dir: str = "processed"
     cors_origins: str = "http://localhost:3000"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
