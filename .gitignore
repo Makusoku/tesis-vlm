@@ -9,6 +9,7 @@ build
 backend/.venv
 backend/uploads
 backend/processed
+backend/backend/
 __pycache__
 *.pyc
 tsconfig.tsbuildinfo

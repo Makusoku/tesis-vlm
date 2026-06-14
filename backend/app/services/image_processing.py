@@ -1,3 +1,4 @@
+from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
 
@@ -8,6 +9,32 @@ from PIL import Image, UnidentifiedImageError
 
 
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
+RAW_MAX_SIDE = 1600
+JPEG_QUALITY = 85
+
+
+def resize_max_side(image: Image.Image, max_side: int) -> Image.Image:
+    width, height = image.size
+    longest_side = max(width, height)
+    if longest_side <= max_side:
+        return image.copy()
+
+    scale = max_side / longest_side
+    target_size = (round(width * scale), round(height * scale))
+    return image.resize(target_size, Image.Resampling.LANCZOS)
+
+
+def letterbox_image(image: Image.Image, size: tuple[int, int], fill: tuple[int, int, int] = (255, 255, 255)) -> Image.Image:
+    target_width, target_height = size
+    width, height = image.size
+    scale = min(target_width / width, target_height / height)
+    resized_size = (round(width * scale), round(height * scale))
+    resized = image.resize(resized_size, Image.Resampling.LANCZOS)
+
+    canvas = Image.new("RGB", size, fill)
+    offset = ((target_width - resized_size[0]) // 2, (target_height - resized_size[1]) // 2)
+    canvas.paste(resized, offset)
+    return canvas
 
 
 async def save_upload(file: UploadFile, upload_dir: str) -> tuple[Path, dict[str, object]]:
@@ -15,18 +42,19 @@ async def save_upload(file: UploadFile, upload_dir: str) -> tuple[Path, dict[str
         raise HTTPException(status_code=415, detail="Only JPEG, PNG, and WEBP images are accepted")
 
     Path(upload_dir).mkdir(parents=True, exist_ok=True)
-    extension = Path(file.filename or "leaf.jpg").suffix.lower() or ".jpg"
-    target = Path(upload_dir) / f"{uuid4()}{extension}"
+    target = Path(upload_dir) / f"{uuid4()}.jpg"
     content = await file.read()
-    target.write_bytes(content)
 
     try:
-        with Image.open(target) as image:
+        with Image.open(BytesIO(content)) as image:
+            rgb_image = image.convert("RGB")
+            optimized = resize_max_side(rgb_image, RAW_MAX_SIDE)
+            optimized.save(target, format="JPEG", quality=JPEG_QUALITY, optimize=True)
             metadata = {
-                "width": image.width,
-                "height": image.height,
-                "color_mode": image.mode,
-                "image_format": image.format or extension.replace(".", "").upper(),
+                "width": optimized.width,
+                "height": optimized.height,
+                "color_mode": "RGB",
+                "image_format": "JPEG",
             }
     except UnidentifiedImageError as exc:
         target.unlink(missing_ok=True)
@@ -40,21 +68,20 @@ def preprocess_image(source_path: str, processed_dir: str, size: tuple[int, int]
 
     with Image.open(source_path) as pil_image:
         rgb_image = pil_image.convert("RGB")
-        image_format = pil_image.format or "JPEG"
-        original_width, original_height = pil_image.size
+        source_width, source_height = pil_image.size
 
-    tensor = np.array(rgb_image)
-    resized = cv2.resize(tensor, size, interpolation=cv2.INTER_AREA)
-    normalized = resized.astype(np.float32) / 255.0
+    letterboxed = letterbox_image(rgb_image, size)
+    tensor = np.array(letterboxed)
+    normalized = tensor.astype(np.float32) / 255.0
 
     processed_path = Path(processed_dir) / f"{Path(source_path).stem}_processed.jpg"
-    cv2.imwrite(str(processed_path), cv2.cvtColor(resized, cv2.COLOR_RGB2BGR))
+    cv2.imwrite(str(processed_path), cv2.cvtColor(tensor, cv2.COLOR_RGB2BGR), [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUALITY])
 
     return {
         "processed_path": str(processed_path),
-        "width": original_width,
-        "height": original_height,
+        "width": source_width,
+        "height": source_height,
         "color_mode": "RGB",
-        "image_format": image_format,
+        "image_format": "JPEG",
         "tensor_shape": tuple(int(value) for value in normalized.shape),
     }

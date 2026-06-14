@@ -141,9 +141,14 @@ def list_dataset(db: Session = Depends(get_db)) -> list[DatasetRecordResponse]:
         DatasetRecordResponse(
             image_id=image.id,
             specimen_code=image.specimen_code,
+            original_path=image.original_path,
             processed_path=image.processed_path,
             status=image.status,
             annotations=len(image.annotations),
+            width=image.width,
+            height=image.height,
+            color_mode=image.color_mode,
+            image_format=image.image_format,
         )
         for image in images
     ]

@@ -24,6 +24,14 @@ npm install
 npm run dev
 ```
 
+Variables necesarias en `frontend/.env.local`:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+La vista Dataset consulta `GET /dataset` y `GET /dataset/export/jsonl`. El boton `Subir hojas` envia imagenes a `POST /images` y luego ejecuta `POST /images/{id}/preprocess`.
+
 ## Desarrollo backend
 
 ```bash
@@ -47,5 +55,10 @@ CORS_ORIGINS=http://localhost:3000
 ```
 
 El bucket `leaf-images` debe existir en Supabase Storage y mantenerse privado. El backend guarda una copia local temporal para procesar con OpenCV/Pillow y registra en PostgreSQL la ruta del objeto almacenado.
+
+Politica de imagenes:
+
+- `raw/`: imagen optimizada en JPEG, RGB, calidad 85 y lado largo maximo de 1600px.
+- `processed/`: imagen 512x512 en JPEG, RGB, calidad 85, manteniendo proporcion y agregando padding para no deformar sintomas foliares.
 
 La primera version usa datos mock en la interfaz. El backend ya queda conectado para ingesta, preprocesamiento, Storage y persistencia relacional.

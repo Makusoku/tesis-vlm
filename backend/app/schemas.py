@@ -43,9 +43,14 @@ class AnnotationResponse(AnnotationCreate):
 class DatasetRecordResponse(BaseModel):
     image_id: str
     specimen_code: str
+    original_path: str
     processed_path: str | None
     status: str
     annotations: int
+    width: int | None
+    height: int | None
+    color_mode: str | None
+    image_format: str | None
 
 
 class JsonlRecord(BaseModel):
