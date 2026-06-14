@@ -3,8 +3,9 @@ import { StatCard } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { datasetRecords, exportFormats } from "@/lib/mock-data";
+import type { ApiDatasetRecord, ApiJsonlRecord } from "@/lib/api";
 
-const jsonlExample = {
+const fallbackJsonlExample = {
   image: "s3://agrocafellm/processed/IMG-CAF-00045.jpg",
   messages: [
     {
@@ -26,16 +27,47 @@ const jsonlExample = {
   },
 };
 
-export function DatasetView() {
-  const readyRecords = datasetRecords.filter((record) => record.exportReady).length;
+interface DatasetViewProps {
+  records?: ApiDatasetRecord[];
+  jsonlRecords?: ApiJsonlRecord[];
+  apiError?: string | null;
+}
+
+export function DatasetView({ records = [], jsonlRecords = [], apiError = null }: DatasetViewProps) {
+  const hasRealRecords = records.length > 0;
+  const readyRecords = hasRealRecords
+    ? records.filter((record) => record.status === "preprocessed" || record.annotations > 0).length
+    : datasetRecords.filter((record) => record.exportReady).length;
+  const jsonlExample = jsonlRecords[0] ?? fallbackJsonlExample;
 
   return (
     <div className="space-y-6">
+      {apiError ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+          Backend no disponible: mostrando datos mock. {apiError}
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={ImageIcon} label="Imágenes cargadas" value="1,248" sub="327 pendientes" />
+        <StatCard
+          icon={ImageIcon}
+          label="Imágenes cargadas"
+          value={hasRealRecords ? String(records.length) : "1,248"}
+          sub={hasRealRecords ? `${records.filter((record) => record.status === "uploaded").length} pendientes` : "327 pendientes"}
+        />
         <StatCard icon={UserIcon} label="Expertos activos" value="24" sub="8 esta semana" />
-        <StatCard icon={CheckIcon} label="Registros validados" value="812" sub={`${readyRecords} listos en muestra mock`} />
-        <StatCard icon={AlertIcon} label="Casos conflictivos" value="93" sub="Requieren consenso" />
+        <StatCard
+          icon={CheckIcon}
+          label="Registros validados"
+          value={hasRealRecords ? String(readyRecords) : "812"}
+          sub={hasRealRecords ? "desde PostgreSQL" : `${readyRecords} listos en muestra mock`}
+        />
+        <StatCard
+          icon={AlertIcon}
+          label="Casos conflictivos"
+          value={hasRealRecords ? String(records.filter((record) => record.annotations === 0).length) : "93"}
+          sub={hasRealRecords ? "sin anotación experta" : "Requieren consenso"}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-6 2xl:grid-cols-12">
@@ -58,7 +90,9 @@ export function DatasetView() {
                   <p className="font-bold text-slate-950">{format.name}</p>
                   <p className="mt-1 min-h-10 text-xs text-slate-500">{format.description}</p>
                   <div className="mt-4 flex items-center justify-between gap-3">
-                    <span className="text-xs font-semibold text-slate-500">{format.recordCount} registros</span>
+                    <span className="text-xs font-semibold text-slate-500">
+                      {hasRealRecords ? records.length : format.recordCount} registros
+                    </span>
                     <Button variant="outline" className="px-3">
                       Exportar
                     </Button>
@@ -97,40 +131,85 @@ export function DatasetView() {
               <span>Consenso</span>
               <span>Estado</span>
             </div>
-            {datasetRecords.map((record) => (
-              <div
-                key={record.id}
-                className="grid gap-3 border-t border-slate-200 px-4 py-4 text-sm lg:grid-cols-[1.2fr_1fr_1fr_1fr_0.8fr] lg:items-center"
-              >
-                <div>
-                  <p className="font-bold text-slate-950">{record.image.specimenCode}</p>
-                  <p className="text-xs text-slate-500">{record.image.storagePath}</p>
-                </div>
-                <div>
-                  <p className="font-semibold text-slate-800">{record.annotation.deficiency}</p>
-                  <p className="text-xs text-slate-500">Severidad {record.annotation.severity}</p>
-                </div>
-                <div>
-                  <p className="text-slate-700">{record.metadata.region}</p>
-                  <p className="text-xs text-slate-500">{record.metadata.variety}</p>
-                </div>
-                <div>
-                  <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                    <div className="h-full rounded-full bg-emerald-600" style={{ width: `${record.annotation.consensus * 100}%` }} />
-                  </div>
-                  <p className="mt-1 text-xs font-semibold text-slate-600">{Math.round(record.annotation.consensus * 100)}%</p>
-                </div>
-                <div>
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                      record.exportReady ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
-                    }`}
+            {hasRealRecords
+              ? records.map((record) => {
+                  const progress = record.annotations > 0 ? 100 : record.status === "preprocessed" ? 60 : 25;
+
+                  return (
+                    <div
+                      key={record.image_id}
+                      className="grid gap-3 border-t border-slate-200 px-4 py-4 text-sm lg:grid-cols-[1.2fr_1fr_1fr_1fr_0.8fr] lg:items-center"
+                    >
+                      <div>
+                        <p className="font-bold text-slate-950">{record.specimen_code}</p>
+                        <p className="break-all text-xs text-slate-500">{record.processed_path ?? record.original_path}</p>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-800">
+                          {record.annotations > 0 ? "Con juicio experto" : "Pendiente de juicio"}
+                        </p>
+                        <p className="text-xs text-slate-500">{record.annotations} anotaciones</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-700">
+                          {record.width && record.height ? `${record.width} x ${record.height}px` : "Sin dimensiones"}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {[record.image_format, record.color_mode].filter(Boolean).join(" · ") || "Sin metadatos"}
+                        </p>
+                      </div>
+                      <div>
+                        <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                          <div className="h-full rounded-full bg-emerald-600" style={{ width: `${progress}%` }} />
+                        </div>
+                        <p className="mt-1 text-xs font-semibold text-slate-600">{progress}%</p>
+                      </div>
+                      <div>
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            record.status === "preprocessed" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                          }`}
+                        >
+                          {record.status === "preprocessed" ? "Procesada" : "Subida"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              : datasetRecords.map((record) => (
+                  <div
+                    key={record.id}
+                    className="grid gap-3 border-t border-slate-200 px-4 py-4 text-sm lg:grid-cols-[1.2fr_1fr_1fr_1fr_0.8fr] lg:items-center"
                   >
-                    {record.exportReady ? "Listo" : "Revisión"}
-                  </span>
-                </div>
-              </div>
-            ))}
+                    <div>
+                      <p className="font-bold text-slate-950">{record.image.specimenCode}</p>
+                      <p className="text-xs text-slate-500">{record.image.storagePath}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-800">{record.annotation.deficiency}</p>
+                      <p className="text-xs text-slate-500">Severidad {record.annotation.severity}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-700">{record.metadata.region}</p>
+                      <p className="text-xs text-slate-500">{record.metadata.variety}</p>
+                    </div>
+                    <div>
+                      <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-full rounded-full bg-emerald-600" style={{ width: `${record.annotation.consensus * 100}%` }} />
+                      </div>
+                      <p className="mt-1 text-xs font-semibold text-slate-600">{Math.round(record.annotation.consensus * 100)}%</p>
+                    </div>
+                    <div>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          record.exportReady ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                        }`}
+                      >
+                        {record.exportReady ? "Listo" : "Revisión"}
+                      </span>
+                    </div>
+                  </div>
+                ))}
           </div>
         </CardContent>
       </Card>

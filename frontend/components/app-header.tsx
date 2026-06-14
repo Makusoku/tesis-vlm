@@ -1,5 +1,5 @@
-import { SearchIcon, UploadIcon } from "./icons";
-import { Button } from "./ui/button";
+import { SearchIcon } from "./icons";
+import { UploadLeafButton } from "./upload-leaf-button";
 
 export function AppHeader() {
   return (
@@ -16,10 +16,7 @@ export function AppHeader() {
             placeholder="Buscar imagen o experto"
           />
         </div>
-        <Button>
-          <UploadIcon className="h-4 w-4" />
-          Subir hojas
-        </Button>
+        <UploadLeafButton />
       </div>
     </header>
   );
