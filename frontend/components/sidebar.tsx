@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { expert } from "@/lib/mock-data";
 import { DatabaseIcon, LeafIcon, LogoutIcon, MenuIcon, SidebarPinIcon, XIcon } from "./icons";
 
 const navItems = [
@@ -11,14 +10,26 @@ const navItems = [
   { href: "/dataset", label: "Dataset", icon: DatabaseIcon },
 ];
 
-const expertInitial = expert.name.trim().charAt(0).toUpperCase();
+interface SidebarProps {
+  user: {
+    email?: string | null;
+    name: string;
+    role?: string | null;
+  };
+}
 
-export function Sidebar() {
+export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname();
   const [isPinned, setIsPinned] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const isExpanded = isPinned || isHovered;
+  const postLogoutRedirectURL = process.env.NEXT_PUBLIC_APP_URL
+    ? `${process.env.NEXT_PUBLIC_APP_URL}/login`
+    : "/login";
+  const logoutHref = `/api/auth/logout?post_logout_redirect_url=${encodeURIComponent(postLogoutRedirectURL)}`;
+  const userInitial = user.name.trim().charAt(0).toUpperCase() || "U";
+  const userSubtitle = user.email || user.role || "Sesión activa";
 
   useEffect(() => {
     setIsPinned(window.localStorage.getItem("agrocafellm-sidebar-pinned") === "true");
@@ -108,18 +119,18 @@ export function Sidebar() {
             }`}
           >
             <span className="absolute left-0 top-0 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-400 text-2xl font-semibold leading-none text-emerald-950">
-              {expertInitial}
+              {userInitial}
             </span>
             <div className="absolute left-[4.5rem] right-14 top-1/2 min-w-0 -translate-y-1/2">
-              <p className="truncate text-base font-bold leading-tight">{expert.name}</p>
-              <p className="truncate text-sm font-semibold leading-tight text-white/60">{expert.role}</p>
+              <p className="truncate text-base font-bold leading-tight">{user.name}</p>
+              <p className="truncate text-sm font-semibold leading-tight text-white/60">{userSubtitle}</p>
             </div>
             <Link
               aria-label="Cerrar sesión"
               className={`absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl text-white/80 transition hover:bg-white/10 hover:text-white ${
                 expanded ? "opacity-100" : "pointer-events-none opacity-0"
               }`}
-              href="/login"
+              href={logoutHref}
               tabIndex={expanded ? 0 : -1}
               title="Cerrar sesión"
             >

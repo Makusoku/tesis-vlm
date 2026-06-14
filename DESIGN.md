@@ -48,9 +48,8 @@ La tabla o listado debe priorizar trazabilidad: imagen, diagnostico, metadatos, 
 
 ## Layout
 
-- Las vistas principales deben usar rutas reales de Next.js: `/login` para inicio de sesion, `/juicio-experto` para anotacion experta y `/dataset` para dataset curado.
-- La pagina `/login` no debe mostrar sidebar; debe incluir acceso con correo y una opcion visible para continuar con Google.
-- El campo de contrasena del login debe incluir accion de mostrar/ocultar con icono de ojo.
+- Las vistas principales deben usar rutas reales de Next.js: `/login` para inicio de sesión, `/juicio-experto` para anotación experta y `/dataset` para dataset curado.
+- La página `/login` no debe mostrar sidebar ni formulario local de contraseña; debe redirigir al flujo hospedado de Kinde.
 - Usar sidebar persistente en desktop.
 - La identidad superior del sidebar debe mostrar solo el nombre de la pagina/proyecto; no usar subtitulo en ese bloque.
 - El sidebar debe estar colapsado por defecto en desktop, mostrando solo iconos.
@@ -193,7 +192,7 @@ Por ahora no disenar:
 
 - Landing page publica.
 - Dashboard ejecutivo completo.
-- Sistema de autenticacion visual completo.
+- Sistema de autenticacion visual propio.
 - Entrenamiento de IA.
 - Administracion avanzada de usuarios.
 
