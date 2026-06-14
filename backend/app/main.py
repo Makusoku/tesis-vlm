@@ -1,4 +1,7 @@
+from pathlib import Path
+
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -14,8 +17,18 @@ from .schemas import (
     PreprocessResponse,
 )
 from .services.image_processing import preprocess_image, save_upload
+from .services.storage import download_from_supabase, upload_to_supabase
 
 app = FastAPI(title="AgroCafeLLM API", version="0.1.0")
+settings = get_settings()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origin_list,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.on_event("startup")
@@ -25,7 +38,10 @@ def startup() -> None:
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "storage": "enabled" if settings.storage_enabled else "local",
+    }
 
 
 @app.post("/experts", response_model=dict[str, str])
@@ -43,11 +59,17 @@ async def upload_image(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ) -> LeafImage:
-    settings = get_settings()
     original_path, metadata = await save_upload(file, settings.upload_dir)
+    object_key = f"raw/{specimen_code}/{original_path.name}"
+    stored_path = upload_to_supabase(
+        settings=settings,
+        file_path=original_path,
+        object_key=object_key,
+        content_type=file.content_type or "application/octet-stream",
+    )
     image = LeafImage(
         specimen_code=specimen_code,
-        original_path=str(original_path),
+        original_path=stored_path,
         width=metadata["width"],
         height=metadata["height"],
         color_mode=metadata["color_mode"],
@@ -62,13 +84,23 @@ async def upload_image(
 
 @app.post("/images/{image_id}/preprocess", response_model=PreprocessResponse)
 def preprocess_leaf_image(image_id: str, db: Session = Depends(get_db)) -> dict[str, object]:
-    settings = get_settings()
     image = db.get(LeafImage, image_id)
     if image is None:
         raise HTTPException(status_code=404, detail="Image not found")
 
-    result = preprocess_image(image.original_path, settings.processed_dir)
-    image.processed_path = str(result["processed_path"])
+    source_path = image.original_path
+    if source_path.startswith("storage://"):
+        source_path = str(download_from_supabase(settings, source_path, settings.upload_dir))
+
+    result = preprocess_image(source_path, settings.processed_dir)
+    processed_local_path = Path(str(result["processed_path"]))
+    processed_object_key = f"processed/{image.specimen_code}/{processed_local_path.name}"
+    image.processed_path = upload_to_supabase(
+        settings=settings,
+        file_path=processed_local_path,
+        object_key=processed_object_key,
+        content_type="image/jpeg",
+    )
     image.width = int(result["width"])
     image.height = int(result["height"])
     image.color_mode = str(result["color_mode"])
