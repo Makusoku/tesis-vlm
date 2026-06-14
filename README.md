@@ -32,6 +32,10 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 La vista Dataset consulta `GET /dataset` y `GET /dataset/export/jsonl`. El boton `Subir hojas` envia imagenes a `POST /images` y luego ejecuta `POST /images/{id}/preprocess`.
 
+La vista Juicio experto consulta `GET /images/pending`, visualiza la imagen privada mediante una URL temporal generada por el backend, asegura el experto con `POST /experts/ensure` y guarda el juicio en `POST /annotations`.
+
+La regla inicial de consenso usa 4 anotaciones expertas distintas por imagen. El backend recalcula consenso despues de cada anotacion; una imagen queda validada cuando alcanza 4 juicios y una deficiencia obtiene al menos 3 coincidencias de 4 (`consensus >= 0.75`). Empates o acuerdos de 2/4 quedan como casos conflictivos.
+
 ## Desarrollo backend
 
 ```bash

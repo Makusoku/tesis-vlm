@@ -1,20 +1,32 @@
 "use client";
 
-import Image from "next/image";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { deficiencies, leafImage, symptomCatalog } from "@/lib/mock-data";
 import type { Deficiency, ImageQuality, Severity } from "@/lib/types";
+import type { ApiPendingImage } from "@/lib/api";
+import { createAnnotation, ensureExpert } from "@/lib/api";
 import { ArrowRightIcon, ClipboardIcon, ImageIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 const severities: Severity[] = ["Leve", "Moderada", "Severa", "Critica"];
 const qualities: ImageQuality[] = ["Alta", "Media", "Baja"];
+const zoomLevels = [1, 1.5, 2];
+const contrastLevels = [1, 1.25, 1.5];
 
-export function ExpertJudgmentView() {
+interface ExpertJudgmentViewProps {
+  expertName: string;
+  pendingImage?: ApiPendingImage | null;
+  apiError?: string | null;
+}
+
+export function ExpertJudgmentView({ expertName, pendingImage = null, apiError = null }: ExpertJudgmentViewProps) {
+  const router = useRouter();
   const [selectedDeficiency, setSelectedDeficiency] = useState<Deficiency>("Magnesio (Mg)");
   const [severity, setSeverity] = useState<Severity>("Moderada");
   const [quality, setQuality] = useState<ImageQuality>("Alta");
+  const [confidence, setConfidence] = useState(82);
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([
     "Clorosis intervenal",
     "Amarillamiento en hojas adultas",
@@ -23,6 +35,21 @@ export function ExpertJudgmentView() {
   const [description, setDescription] = useState(
     "El patrón de clorosis intervenal en hojas adultas sugiere deficiencia de magnesio. Las nervaduras permanecen relativamente verdes, diferenciándose de un amarillamiento generalizado por nitrógeno."
   );
+  const [zoomIndex, setZoomIndex] = useState(0);
+  const [rotation, setRotation] = useState(0);
+  const [contrastIndex, setContrastIndex] = useState(0);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [dragStart, setDragStart] = useState<{ pointerId: number; x: number; y: number; panX: number; panY: number } | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const imageSrc = pendingImage?.preview_url ?? leafImage.url;
+  const specimenCode = pendingImage?.specimen_code ?? leafImage.specimenCode;
+  const imageStatus = pendingImage ? "Pendiente de juicio experto" : apiError ? "Modo mock" : "Sin imagen pendiente";
+  const canSave = Boolean(pendingImage);
+  const zoom = zoomLevels[zoomIndex];
+  const contrast = contrastLevels[contrastIndex];
+  const canPan = zoom > 1;
 
   function toggleSymptom(symptom: string) {
     setSelectedSymptoms((current) =>
@@ -30,28 +57,102 @@ export function ExpertJudgmentView() {
     );
   }
 
+  function cycleZoom() {
+    setZoomIndex((current) => {
+      const next = (current + 1) % zoomLevels.length;
+      if (zoomLevels[next] === 1) {
+        setPan({ x: 0, y: 0 });
+      }
+      return next;
+    });
+  }
+
+  function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (!canPan) {
+      return;
+    }
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDragStart({
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      panX: pan.x,
+      panY: pan.y,
+    });
+  }
+
+  function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (!dragStart || dragStart.pointerId !== event.pointerId) {
+      return;
+    }
+
+    setPan({
+      x: dragStart.panX + event.clientX - dragStart.x,
+      y: dragStart.panY + event.clientY - dragStart.y,
+    });
+  }
+
+  function handlePointerUp(event: React.PointerEvent<HTMLDivElement>) {
+    if (dragStart?.pointerId === event.pointerId) {
+      setDragStart(null);
+    }
+  }
+
+  async function handleSave() {
+    if (!pendingImage) {
+      setMessage("No hay una imagen pendiente real para anotar.");
+      return;
+    }
+
+    setIsSaving(true);
+    setMessage(null);
+
+    try {
+      const expert = await ensureExpert(expertName);
+      await createAnnotation({
+        image_id: pendingImage.image_id,
+        expert_id: expert.id,
+        deficiency: selectedDeficiency,
+        severity,
+        confidence,
+        symptoms: selectedSymptoms,
+        clinical_description: description,
+        consensus: 0,
+        expert_validated: true,
+      });
+
+      setMessage("Juicio experto guardado correctamente.");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo guardar el juicio experto.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <div className="grid grid-cols-1 gap-6 2xl:grid-cols-12">
       <section className="2xl:col-span-7">
         <Card className="overflow-hidden">
           <CardContent>
+            {apiError ? (
+              <div className="border-b border-amber-100 bg-amber-50 px-5 py-3 text-sm font-medium text-amber-900">
+                Backend no disponible: mostrando imagen mock. {apiError}
+              </div>
+            ) : null}
             <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs text-slate-500">Imagen asignada</p>
-                <h3 className="text-lg font-bold text-slate-950">
-                  {leafImage.specimenCode} · {leafImage.leafStage}
-                </h3>
+                <h3 className="text-lg font-bold text-slate-950">{specimenCode} · Hoja foliar</h3>
               </div>
               <span className="w-fit rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
-                Pendiente de consenso
+                {imageStatus}
               </span>
             </div>
 
-            <div className="relative bg-slate-100 p-5">
-              <div className="relative h-[420px] overflow-hidden rounded-2xl shadow-inner md:h-[560px]">
-                <Image src={leafImage.url} alt="Hoja de café para anotación experta" fill className="object-cover" priority />
-              </div>
-              <div className="absolute left-8 top-8 max-w-xs rounded-2xl bg-white/90 p-3 shadow-md backdrop-blur">
+            <div className="bg-slate-100 p-5">
+              <div className="mb-4 rounded-2xl bg-white/85 p-3 shadow-sm">
                 <p className="flex items-center gap-2 text-xs font-bold text-slate-950">
                   <ImageIcon className="h-4 w-4 text-emerald-700" />
                   Zona visible sugerida
@@ -60,12 +161,55 @@ export function ExpertJudgmentView() {
                   Registre síntomas y ubique si la afectación aparece en bordes, nervaduras o lámina foliar.
                 </p>
               </div>
-              <div className="absolute bottom-8 right-8 hidden gap-2 md:flex">
-                {["Zoom", "Rotar", "Contraste", "Anotar"].map((action) => (
-                  <button key={action} className="rounded-xl bg-white/90 px-3 py-2 text-xs font-semibold shadow-sm" type="button">
-                    {action}
-                  </button>
-                ))}
+              <div
+                className={`relative h-[420px] touch-none overflow-hidden rounded-2xl shadow-inner md:h-[560px] ${
+                  canPan ? "cursor-grab active:cursor-grabbing" : ""
+                }`}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerUp}
+                onDoubleClick={() => {
+                  setPan({ x: 0, y: 0 });
+                  setZoomIndex(0);
+                }}
+              >
+                <img
+                  src={imageSrc}
+                  alt="Hoja de café para anotación experta"
+                  draggable={false}
+                  className="h-full w-full select-none object-contain transition duration-300"
+                  style={{
+                    filter: `contrast(${contrast})`,
+                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom}) rotate(${rotation}deg)`,
+                  }}
+                />
+              </div>
+              <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <button
+                  className="min-h-10 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:bg-emerald-50"
+                  type="button"
+                  onClick={cycleZoom}
+                  aria-label="Cambiar zoom de la imagen"
+                >
+                  Zoom {zoom === 1 ? "1x" : `${zoom}x`}
+                </button>
+                <button
+                  className="min-h-10 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:bg-emerald-50"
+                  type="button"
+                  onClick={() => setRotation((current) => (current + 90) % 360)}
+                  aria-label="Rotar imagen 90 grados"
+                >
+                  Rotar {rotation}°
+                </button>
+                <button
+                  className="min-h-10 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:bg-emerald-50"
+                  type="button"
+                  onClick={() => setContrastIndex((current) => (current + 1) % contrastLevels.length)}
+                  aria-label="Cambiar contraste de la imagen"
+                >
+                  Contraste {Math.round(contrast * 100)}%
+                </button>
               </div>
             </div>
           </CardContent>
@@ -124,6 +268,21 @@ export function ExpertJudgmentView() {
                 </select>
               </div>
             </div>
+
+            <div className="mt-4">
+              <div className="flex items-center justify-between gap-3">
+                <label className="text-xs font-semibold text-slate-500">Confianza experta</label>
+                <span className="text-xs font-bold text-emerald-700">{confidence}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={confidence}
+                onChange={(event) => setConfidence(Number(event.target.value))}
+                className="mt-2 w-full accent-emerald-700"
+              />
+            </div>
           </CardContent>
         </Card>
 
@@ -156,10 +315,13 @@ export function ExpertJudgmentView() {
             />
             <div className="mt-4 rounded-2xl bg-canopy-50 p-3 text-xs text-slate-600">
               <b className="text-slate-950">Registro actual:</b> {selectedDeficiency}, severidad {severity.toLowerCase()},
-              imagen de calidad {quality.toLowerCase()}, {selectedSymptoms.length} síntomas marcados.
+              imagen de calidad {quality.toLowerCase()}, {selectedSymptoms.length} síntomas marcados, confianza {confidence}%.
             </div>
-            <Button className="mt-4 w-full">
-              Guardar juicio y siguiente
+            {message ? (
+              <p className="mt-4 rounded-2xl bg-slate-50 p-3 text-xs font-medium text-slate-600">{message}</p>
+            ) : null}
+            <Button className="mt-4 w-full" disabled={isSaving || !canSave} onClick={handleSave}>
+              {isSaving ? "Guardando..." : "Guardar juicio y siguiente"}
               <ArrowRightIcon className="h-4 w-4" />
             </Button>
           </CardContent>

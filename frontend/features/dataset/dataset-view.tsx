@@ -5,6 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { datasetRecords, exportFormats } from "@/lib/mock-data";
 import type { ApiDatasetRecord, ApiJsonlRecord } from "@/lib/api";
 
+const requiredAnnotations = 4;
+
 const fallbackJsonlExample = {
   image: "s3://agrocafellm/processed/IMG-CAF-00045.jpg",
   messages: [
@@ -36,7 +38,7 @@ interface DatasetViewProps {
 export function DatasetView({ records = [], jsonlRecords = [], apiError = null }: DatasetViewProps) {
   const hasRealRecords = records.length > 0;
   const readyRecords = hasRealRecords
-    ? records.filter((record) => record.status === "preprocessed" || record.annotations > 0).length
+    ? records.filter((record) => record.expert_validated).length
     : datasetRecords.filter((record) => record.exportReady).length;
   const jsonlExample = jsonlRecords[0] ?? fallbackJsonlExample;
 
@@ -66,7 +68,7 @@ export function DatasetView({ records = [], jsonlRecords = [], apiError = null }
           icon={AlertIcon}
           label="Casos conflictivos"
           value={hasRealRecords ? String(records.filter((record) => record.annotations === 0).length) : "93"}
-          sub={hasRealRecords ? "sin anotación experta" : "Requieren consenso"}
+          sub={hasRealRecords ? "sin consenso suficiente" : "Requieren consenso"}
         />
       </div>
 
@@ -133,7 +135,7 @@ export function DatasetView({ records = [], jsonlRecords = [], apiError = null }
             </div>
             {hasRealRecords
               ? records.map((record) => {
-                  const progress = record.annotations > 0 ? 100 : record.status === "preprocessed" ? 60 : 25;
+                  const progress = Math.min(100, Math.round((record.annotations / requiredAnnotations) * 100));
 
                   return (
                     <div
@@ -146,9 +148,11 @@ export function DatasetView({ records = [], jsonlRecords = [], apiError = null }
                       </div>
                       <div>
                         <p className="font-semibold text-slate-800">
-                          {record.annotations > 0 ? "Con juicio experto" : "Pendiente de juicio"}
+                          {record.final_diagnosis ?? (record.annotations > 0 ? "En consenso" : "Pendiente de juicio")}
                         </p>
-                        <p className="text-xs text-slate-500">{record.annotations} anotaciones</p>
+                        <p className="text-xs text-slate-500">
+                          {record.annotations}/{requiredAnnotations} anotaciones
+                        </p>
                       </div>
                       <div>
                         <p className="text-slate-700">
@@ -160,17 +164,22 @@ export function DatasetView({ records = [], jsonlRecords = [], apiError = null }
                       </div>
                       <div>
                         <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                          <div className="h-full rounded-full bg-emerald-600" style={{ width: `${progress}%` }} />
+                          <div
+                            className={`h-full rounded-full ${record.expert_validated ? "bg-emerald-600" : "bg-amber-400"}`}
+                            style={{ width: `${progress}%` }}
+                          />
                         </div>
-                        <p className="mt-1 text-xs font-semibold text-slate-600">{progress}%</p>
+                        <p className="mt-1 text-xs font-semibold text-slate-600">
+                          {record.annotations > 0 ? `${Math.round(record.consensus * 100)}% consenso` : `${progress}% avance`}
+                        </p>
                       </div>
                       <div>
                         <span
                           className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                            record.status === "preprocessed" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                            record.expert_validated ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
                           }`}
                         >
-                          {record.status === "preprocessed" ? "Procesada" : "Subida"}
+                          {record.expert_validated ? "Validada" : record.annotations >= requiredAnnotations ? "Conflictiva" : "Pendiente"}
                         </span>
                       </div>
                     </div>

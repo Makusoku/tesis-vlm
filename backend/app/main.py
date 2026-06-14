@@ -1,3 +1,4 @@
+from collections import Counter
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
@@ -12,15 +13,20 @@ from .schemas import (
     AnnotationCreate,
     AnnotationResponse,
     DatasetRecordResponse,
+    ExpertEnsure,
+    ExpertResponse,
     ImageResponse,
     JsonlRecord,
+    PendingImageResponse,
     PreprocessResponse,
 )
 from .services.image_processing import preprocess_image, save_upload
-from .services.storage import download_from_supabase, upload_to_supabase
+from .services.storage import create_signed_url, download_from_supabase, upload_to_supabase
 
 app = FastAPI(title="AgroCafeLLM API", version="0.1.0")
 settings = get_settings()
+MIN_ANNOTATIONS_FOR_CONSENSUS = 4
+CONSENSUS_VALIDATION_THRESHOLD = 0.75
 
 app.add_middleware(
     CORSMiddleware,
@@ -53,6 +59,23 @@ def create_expert(name: str, role: str = "Analista Agronomico", db: Session = De
     return {"id": expert.id, "name": expert.name, "role": expert.role}
 
 
+@app.post("/experts/ensure", response_model=ExpertResponse)
+def ensure_expert(payload: ExpertEnsure, db: Session = Depends(get_db)) -> Expert:
+    return ensure_expert_record(payload.name, payload.role, db)
+
+
+def ensure_expert_record(name: str, role: str, db: Session) -> Expert:
+    expert = db.scalar(select(Expert).where(Expert.name == name, Expert.role == role))
+    if expert is not None:
+        return expert
+
+    expert = Expert(name=name, role=role)
+    db.add(expert)
+    db.commit()
+    db.refresh(expert)
+    return expert
+
+
 @app.post("/images", response_model=ImageResponse)
 async def upload_image(
     specimen_code: str,
@@ -80,6 +103,68 @@ async def upload_image(
     db.commit()
     db.refresh(image)
     return image
+
+
+def dataset_record_from_image(image: LeafImage) -> DatasetRecordResponse:
+    annotations = image.annotations
+    diagnosis_counts = Counter(annotation.deficiency for annotation in annotations)
+    top_items = diagnosis_counts.most_common()
+    top_count = top_items[0][1] if top_items else 0
+    has_tie = len(top_items) > 1 and top_items[1][1] == top_count
+    consensus = (top_count / len(annotations)) if len(annotations) >= 2 else 0
+    expert_validated = len(annotations) >= MIN_ANNOTATIONS_FOR_CONSENSUS and not has_tie and consensus >= CONSENSUS_VALIDATION_THRESHOLD
+    final_diagnosis = top_items[0][0] if expert_validated else None
+
+    return DatasetRecordResponse(
+        image_id=image.id,
+        specimen_code=image.specimen_code,
+        original_path=image.original_path,
+        processed_path=image.processed_path,
+        status=image.status,
+        annotations=len(annotations),
+        consensus=consensus,
+        expert_validated=expert_validated,
+        final_diagnosis=final_diagnosis,
+        width=image.width,
+        height=image.height,
+        color_mode=image.color_mode,
+        image_format=image.image_format,
+    )
+
+
+@app.get("/images/pending", response_model=PendingImageResponse | None)
+def get_pending_image(
+    expert_name: str | None = None,
+    role: str = "Analista agronómico",
+    db: Session = Depends(get_db),
+) -> PendingImageResponse | None:
+    expert = db.scalar(select(Expert).where(Expert.name == expert_name, Expert.role == role)) if expert_name else None
+    images = db.scalars(select(LeafImage).order_by(LeafImage.created_at.asc())).all()
+    image = next(
+        (
+            item
+            for item in images
+            if len(item.annotations) < MIN_ANNOTATIONS_FOR_CONSENSUS
+            and (expert is None or all(annotation.expert_id != expert.id for annotation in item.annotations))
+        ),
+        None,
+    )
+    if image is None:
+        return None
+
+    image_path = image.processed_path or image.original_path
+    record = dataset_record_from_image(image)
+    return PendingImageResponse(**record.model_dump(), preview_url=create_signed_url(settings, image_path))
+
+
+@app.get("/images/{image_id}/signed-url", response_model=dict[str, str])
+def get_image_signed_url(image_id: str, db: Session = Depends(get_db)) -> dict[str, str]:
+    image = db.get(LeafImage, image_id)
+    if image is None:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    image_path = image.processed_path or image.original_path
+    return {"url": create_signed_url(settings, image_path)}
 
 
 @app.post("/images/{image_id}/preprocess", response_model=PreprocessResponse)
@@ -126,9 +211,32 @@ def create_annotation(payload: AnnotationCreate, db: Session = Depends(get_db)) 
         raise HTTPException(status_code=404, detail="Image not found")
     if db.get(Expert, payload.expert_id) is None:
         raise HTTPException(status_code=404, detail="Expert not found")
+    existing_annotation = db.scalar(
+        select(Annotation).where(Annotation.image_id == payload.image_id, Annotation.expert_id == payload.expert_id)
+    )
+    if existing_annotation is not None:
+        raise HTTPException(status_code=409, detail="Expert already annotated this image")
 
     annotation = Annotation(**payload.model_dump())
     db.add(annotation)
+    db.commit()
+    db.refresh(annotation)
+
+    image_annotations = db.scalars(select(Annotation).where(Annotation.image_id == payload.image_id)).all()
+    diagnosis_counts = Counter(item.deficiency for item in image_annotations)
+    top_items = diagnosis_counts.most_common()
+    top_count = top_items[0][1] if top_items else 0
+    has_tie = len(top_items) > 1 and top_items[1][1] == top_count
+    consensus = (top_count / len(image_annotations)) if len(image_annotations) >= 2 else 0
+    expert_validated = (
+        len(image_annotations) >= MIN_ANNOTATIONS_FOR_CONSENSUS
+        and not has_tie
+        and consensus >= CONSENSUS_VALIDATION_THRESHOLD
+    )
+
+    for item in image_annotations:
+        item.consensus = consensus
+        item.expert_validated = expert_validated
     db.commit()
     db.refresh(annotation)
     return annotation
@@ -137,21 +245,7 @@ def create_annotation(payload: AnnotationCreate, db: Session = Depends(get_db)) 
 @app.get("/dataset", response_model=list[DatasetRecordResponse])
 def list_dataset(db: Session = Depends(get_db)) -> list[DatasetRecordResponse]:
     images = db.scalars(select(LeafImage)).all()
-    return [
-        DatasetRecordResponse(
-            image_id=image.id,
-            specimen_code=image.specimen_code,
-            original_path=image.original_path,
-            processed_path=image.processed_path,
-            status=image.status,
-            annotations=len(image.annotations),
-            width=image.width,
-            height=image.height,
-            color_mode=image.color_mode,
-            image_format=image.image_format,
-        )
-        for image in images
-    ]
+    return [dataset_record_from_image(image) for image in images]
 
 
 @app.get("/dataset/export/jsonl", response_model=list[JsonlRecord])

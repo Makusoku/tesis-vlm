@@ -1,6 +1,17 @@
 from pydantic import BaseModel, Field
 
 
+class ExpertEnsure(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    role: str = Field(default="Analista Agronomico", min_length=1, max_length=120)
+
+
+class ExpertResponse(BaseModel):
+    id: str
+    name: str
+    role: str
+
+
 class ImageResponse(BaseModel):
     id: str
     specimen_code: str
@@ -47,10 +58,17 @@ class DatasetRecordResponse(BaseModel):
     processed_path: str | None
     status: str
     annotations: int
+    consensus: float
+    expert_validated: bool
+    final_diagnosis: str | None
     width: int | None
     height: int | None
     color_mode: str | None
     image_format: str | None
+
+
+class PendingImageResponse(DatasetRecordResponse):
+    preview_url: str
 
 
 class JsonlRecord(BaseModel):

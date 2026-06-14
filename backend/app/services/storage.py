@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 import ssl
 from urllib.error import HTTPError, URLError
@@ -82,3 +83,35 @@ def download_from_supabase(settings: Settings, uri: str, target_dir: str) -> Pat
         raise HTTPException(status_code=502, detail=f"Supabase Storage is unreachable: {exc.reason}") from exc
 
     return target
+
+
+def create_signed_url(settings: Settings, uri: str, expires_in: int = 3600) -> str:
+    if not settings.storage_enabled or not uri.startswith("storage://"):
+        return uri
+
+    bucket, object_key = parse_storage_uri(uri)
+    encoded_key = quote(object_key, safe="/")
+    url = f"{settings.supabase_url}/storage/v1/object/sign/{bucket}/{encoded_key}"
+    headers = {
+        "Authorization": f"Bearer {settings.supabase_service_role_key}",
+        "apikey": settings.supabase_service_role_key or "",
+        "Content-Type": "application/json",
+    }
+    data = json.dumps({"expiresIn": expires_in}).encode("utf-8")
+
+    request = Request(url, data=data, headers=headers, method="POST")
+    try:
+        with urlopen(request, timeout=30, context=SSL_CONTEXT) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="ignore") or exc.reason
+        raise HTTPException(status_code=502, detail=f"Supabase signed URL failed: {detail}") from exc
+    except URLError as exc:
+        raise HTTPException(status_code=502, detail=f"Supabase Storage is unreachable: {exc.reason}") from exc
+
+    signed_url = payload.get("signedURL") or payload.get("signedUrl")
+    if not signed_url:
+        raise HTTPException(status_code=502, detail="Supabase did not return a signed URL")
+    if signed_url.startswith("/"):
+        return f"{settings.supabase_url}/storage/v1{signed_url}"
+    return str(signed_url)
