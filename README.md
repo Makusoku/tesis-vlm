@@ -30,7 +30,9 @@ Variables necesarias en `frontend/.env.local`:
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
-La vista Dataset consulta `GET /dataset` y `GET /dataset/export/jsonl`. El boton `Subir hojas` envia imagenes a `POST /images` y luego ejecuta `POST /images/{id}/preprocess`.
+La vista Dataset consulta `GET /dataset`, `GET /dataset/metrics` y `GET /dataset/export/jsonl`. Incluye miniaturas con URLs temporales de Storage, metricas reales de expertos, busqueda por codigo/estado/diagnostico/metadatos, filtros por estado y exportacion descargable en JSONL, JSON y CSV. Si el backend no esta disponible o no hay imagenes, la interfaz muestra estados vacios reales y no datos de demostracion.
+
+El boton `Subir hojas` abre un formulario para registrar imagen, codigo, region, finca, variedad y sintomas iniciales. Luego envia esos datos a `POST /images`, guarda metadatos clinicos en PostgreSQL y ejecuta `POST /images/{id}/preprocess`.
 
 La vista Juicio experto consulta `GET /images/pending`, visualiza la imagen privada mediante una URL temporal generada por el backend, asegura el experto con `POST /experts/ensure` y guarda el juicio en `POST /annotations`.
 
@@ -58,11 +60,11 @@ PROCESSED_DIR=processed
 CORS_ORIGINS=http://localhost:3000
 ```
 
-El bucket `leaf-images` debe existir en Supabase Storage y mantenerse privado. El backend guarda una copia local temporal para procesar con OpenCV/Pillow y registra en PostgreSQL la ruta del objeto almacenado.
+El bucket `leaf-images` debe existir en Supabase Storage y mantenerse privado. El backend guarda una copia local temporal para procesar con OpenCV/Pillow, registra en PostgreSQL la ruta del objeto almacenado y asocia los metadatos clinicos con la imagen.
 
 Politica de imagenes:
 
 - `raw/`: imagen optimizada en JPEG, RGB, calidad 85 y lado largo maximo de 1600px.
 - `processed/`: imagen 512x512 en JPEG, RGB, calidad 85, manteniendo proporcion y agregando padding para no deformar sintomas foliares.
 
-La primera version usa datos mock en la interfaz. El backend ya queda conectado para ingesta, preprocesamiento, Storage y persistencia relacional.
+La interfaz ya consume datos reales del backend para cola de imagenes, dataset, metricas y exportaciones. Los catalogos de deficiencias y sintomas siguen siendo listas locales de apoyo para acelerar la anotacion experta.

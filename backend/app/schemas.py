@@ -42,7 +42,7 @@ class AnnotationCreate(BaseModel):
     severity: str
     confidence: float = Field(ge=0, le=100)
     symptoms: list[str]
-    clinical_description: str = Field(min_length=20)
+    clinical_description: str = Field(min_length=10)
     consensus: float = Field(default=0, ge=0, le=1)
     expert_validated: bool = False
 
@@ -56,11 +56,16 @@ class DatasetRecordResponse(BaseModel):
     specimen_code: str
     original_path: str
     processed_path: str | None
+    preview_url: str | None = None
     status: str
     annotations: int
     consensus: float
     expert_validated: bool
     final_diagnosis: str | None
+    region: str | None = None
+    farm: str | None = None
+    variety: str | None = None
+    metadata_symptoms: list[str] = Field(default_factory=list)
     width: int | None
     height: int | None
     color_mode: str | None
@@ -69,6 +74,15 @@ class DatasetRecordResponse(BaseModel):
 
 class PendingImageResponse(DatasetRecordResponse):
     preview_url: str
+
+
+class DatasetMetricsResponse(BaseModel):
+    images: int
+    experts: int
+    active_experts: int
+    validated: int
+    conflicts: int
+    pending: int
 
 
 class JsonlRecord(BaseModel):

@@ -3,11 +3,16 @@ export interface ApiDatasetRecord {
   specimen_code: string;
   original_path: string;
   processed_path: string | null;
+  preview_url: string | null;
   status: string;
   annotations: number;
   consensus: number;
   expert_validated: boolean;
   final_diagnosis: string | null;
+  region: string | null;
+  farm: string | null;
+  variety: string | null;
+  metadata_symptoms: string[];
   width: number | null;
   height: number | null;
   color_mode: string | null;
@@ -21,6 +26,15 @@ export interface ApiJsonlRecord {
     content: string;
   }>;
   metadata: Record<string, unknown>;
+}
+
+export interface ApiDatasetMetrics {
+  images: number;
+  experts: number;
+  active_experts: number;
+  validated: number;
+  conflicts: number;
+  pending: number;
 }
 
 export interface ApiPendingImage extends ApiDatasetRecord {
@@ -73,6 +87,18 @@ export async function fetchJsonlRecords(): Promise<ApiJsonlRecord[]> {
   return response.json();
 }
 
+export async function fetchDatasetMetrics(): Promise<ApiDatasetMetrics> {
+  const response = await fetch(`${getApiBaseUrl()}/dataset/metrics`, {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`No se pudieron cargar las metricas del dataset (${response.status})`);
+  }
+
+  return response.json();
+}
+
 export async function fetchPendingImage(expertName?: string, role = "Analista agronómico"): Promise<ApiPendingImage | null> {
   const params = new URLSearchParams();
   if (expertName) {
@@ -118,7 +144,14 @@ export async function createAnnotation(payload: ApiAnnotationPayload) {
   });
 
   if (!response.ok) {
-    throw new Error(`No se pudo guardar el juicio experto (${response.status})`);
+    let detail = "";
+    try {
+      const errorBody = (await response.json()) as { detail?: unknown };
+      detail = errorBody.detail ? `: ${JSON.stringify(errorBody.detail)}` : "";
+    } catch {
+      detail = "";
+    }
+    throw new Error(`No se pudo guardar el juicio experto (${response.status})${detail}`);
   }
 
   return response.json();

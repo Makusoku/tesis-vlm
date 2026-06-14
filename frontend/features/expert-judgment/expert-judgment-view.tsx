@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { deficiencies, leafImage, symptomCatalog } from "@/lib/mock-data";
+import { deficiencies, symptomCatalog } from "@/lib/mock-data";
 import type { Deficiency, ImageQuality, Severity } from "@/lib/types";
 import type { ApiPendingImage } from "@/lib/api";
 import { createAnnotation, ensureExpert } from "@/lib/api";
@@ -43,9 +43,9 @@ export function ExpertJudgmentView({ expertName, pendingImage = null, apiError =
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const imageSrc = pendingImage?.preview_url ?? leafImage.url;
-  const specimenCode = pendingImage?.specimen_code ?? leafImage.specimenCode;
-  const imageStatus = pendingImage ? "Pendiente de juicio experto" : apiError ? "Modo mock" : "Sin imagen pendiente";
+  const imageSrc = pendingImage?.preview_url;
+  const specimenCode = pendingImage?.specimen_code ?? "Sin imagen asignada";
+  const imageStatus = pendingImage ? "Pendiente de juicio experto" : apiError ? "Backend no disponible" : "Sin imagen pendiente";
   const canSave = Boolean(pendingImage);
   const zoom = zoomLevels[zoomIndex];
   const contrast = contrastLevels[contrastIndex];
@@ -105,6 +105,17 @@ export function ExpertJudgmentView({ expertName, pendingImage = null, apiError =
       return;
     }
 
+    const clinicalDescription = description.trim();
+    if (clinicalDescription.length < 10) {
+      setMessage("La descripción clínica debe tener al menos 10 caracteres.");
+      return;
+    }
+
+    if (selectedSymptoms.length === 0) {
+      setMessage("Marca al menos un síntoma visible antes de guardar.");
+      return;
+    }
+
     setIsSaving(true);
     setMessage(null);
 
@@ -117,9 +128,7 @@ export function ExpertJudgmentView({ expertName, pendingImage = null, apiError =
         severity,
         confidence,
         symptoms: selectedSymptoms,
-        clinical_description: description,
-        consensus: 0,
-        expert_validated: true,
+        clinical_description: clinicalDescription,
       });
 
       setMessage("Juicio experto guardado correctamente.");
@@ -138,7 +147,7 @@ export function ExpertJudgmentView({ expertName, pendingImage = null, apiError =
           <CardContent>
             {apiError ? (
               <div className="border-b border-amber-100 bg-amber-50 px-5 py-3 text-sm font-medium text-amber-900">
-                Backend no disponible: mostrando imagen mock. {apiError}
+                Backend no disponible: no se puede cargar una imagen pendiente. {apiError}
               </div>
             ) : null}
             <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -152,65 +161,81 @@ export function ExpertJudgmentView({ expertName, pendingImage = null, apiError =
             </div>
 
             <div className="bg-slate-100 p-5">
-              <div className="mb-4 rounded-2xl bg-white/85 p-3 shadow-sm">
-                <p className="flex items-center gap-2 text-xs font-bold text-slate-950">
-                  <ImageIcon className="h-4 w-4 text-emerald-700" />
-                  Zona visible sugerida
-                </p>
-                <p className="mt-1 text-xs text-slate-600">
-                  Registre síntomas y ubique si la afectación aparece en bordes, nervaduras o lámina foliar.
-                </p>
-              </div>
-              <div
-                className={`relative h-[420px] touch-none overflow-hidden rounded-2xl shadow-inner md:h-[560px] ${
-                  canPan ? "cursor-grab active:cursor-grabbing" : ""
-                }`}
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerCancel={handlePointerUp}
-                onDoubleClick={() => {
-                  setPan({ x: 0, y: 0 });
-                  setZoomIndex(0);
-                }}
-              >
-                <img
-                  src={imageSrc}
-                  alt="Hoja de café para anotación experta"
-                  draggable={false}
-                  className="h-full w-full select-none object-contain transition duration-300"
-                  style={{
-                    filter: `contrast(${contrast})`,
-                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom}) rotate(${rotation}deg)`,
-                  }}
-                />
-              </div>
-              <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                <button
-                  className="min-h-10 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:bg-emerald-50"
-                  type="button"
-                  onClick={cycleZoom}
-                  aria-label="Cambiar zoom de la imagen"
-                >
-                  Zoom {zoom === 1 ? "1x" : `${zoom}x`}
-                </button>
-                <button
-                  className="min-h-10 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:bg-emerald-50"
-                  type="button"
-                  onClick={() => setRotation((current) => (current + 90) % 360)}
-                  aria-label="Rotar imagen 90 grados"
-                >
-                  Rotar {rotation}°
-                </button>
-                <button
-                  className="min-h-10 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:bg-emerald-50"
-                  type="button"
-                  onClick={() => setContrastIndex((current) => (current + 1) % contrastLevels.length)}
-                  aria-label="Cambiar contraste de la imagen"
-                >
-                  Contraste {Math.round(contrast * 100)}%
-                </button>
-              </div>
+              {imageSrc ? (
+                <>
+                  <div className="mb-4 rounded-2xl bg-white/85 p-3 shadow-sm">
+                    <p className="flex items-center gap-2 text-xs font-bold text-slate-950">
+                      <ImageIcon className="h-4 w-4 text-emerald-700" />
+                      Zona visible sugerida
+                    </p>
+                    <p className="mt-1 text-xs text-slate-600">
+                      Registre síntomas y ubique si la afectación aparece en bordes, nervaduras o lámina foliar.
+                    </p>
+                  </div>
+                  <div
+                    className={`relative h-[420px] touch-none overflow-hidden rounded-2xl shadow-inner md:h-[560px] ${
+                      canPan ? "cursor-grab active:cursor-grabbing" : ""
+                    }`}
+                    onPointerDown={handlePointerDown}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onPointerCancel={handlePointerUp}
+                    onDoubleClick={() => {
+                      setPan({ x: 0, y: 0 });
+                      setZoomIndex(0);
+                    }}
+                  >
+                    <img
+                      src={imageSrc}
+                      alt="Hoja de café para anotación experta"
+                      draggable={false}
+                      className="h-full w-full select-none object-contain transition duration-300"
+                      style={{
+                        filter: `contrast(${contrast})`,
+                        transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom}) rotate(${rotation}deg)`,
+                      }}
+                    />
+                  </div>
+                  <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <button
+                      className="min-h-10 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:bg-emerald-50"
+                      type="button"
+                      onClick={cycleZoom}
+                      aria-label="Cambiar zoom de la imagen"
+                    >
+                      Zoom {zoom === 1 ? "1x" : `${zoom}x`}
+                    </button>
+                    <button
+                      className="min-h-10 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:bg-emerald-50"
+                      type="button"
+                      onClick={() => setRotation((current) => (current + 90) % 360)}
+                      aria-label="Rotar imagen 90 grados"
+                    >
+                      Rotar {rotation}°
+                    </button>
+                    <button
+                      className="min-h-10 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:bg-emerald-50"
+                      type="button"
+                      onClick={() => setContrastIndex((current) => (current + 1) % contrastLevels.length)}
+                      aria-label="Cambiar contraste de la imagen"
+                    >
+                      Contraste {Math.round(contrast * 100)}%
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 text-center md:min-h-[560px]">
+                  <ImageIcon className="h-12 w-12 text-slate-300" />
+                  <p className="mt-4 text-lg font-bold text-slate-950">
+                    {apiError ? "No se pudo cargar la cola" : "No hay imágenes pendientes"}
+                  </p>
+                  <p className="mt-2 max-w-md text-sm text-slate-500">
+                    {apiError
+                      ? "Revisa que el backend esté encendido y que pueda conectarse con PostgreSQL y Storage."
+                      : "Sube nuevas hojas o espera a que otros expertos completen nuevas imágenes para consenso."}
+                  </p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

@@ -1,18 +1,19 @@
 from collections import Counter
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .config import get_settings
 from .database import Base, engine, get_db
-from .models import Annotation, Expert, LeafImage
+from .models import Annotation, ClinicalMetadata, Expert, LeafImage
 from .schemas import (
     AnnotationCreate,
     AnnotationResponse,
     DatasetRecordResponse,
+    DatasetMetricsResponse,
     ExpertEnsure,
     ExpertResponse,
     ImageResponse,
@@ -78,10 +79,18 @@ def ensure_expert_record(name: str, role: str, db: Session) -> Expert:
 
 @app.post("/images", response_model=ImageResponse)
 async def upload_image(
-    specimen_code: str,
+    specimen_code: str = Form(...),
+    region: str | None = Form(default=None),
+    farm: str | None = Form(default=None),
+    variety: str | None = Form(default=None),
+    symptoms: str | None = Form(default=None),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ) -> LeafImage:
+    specimen_code = specimen_code.strip()
+    if not specimen_code:
+        raise HTTPException(status_code=422, detail="Specimen code is required")
+
     original_path, metadata = await save_upload(file, settings.upload_dir)
     object_key = f"raw/{specimen_code}/{original_path.name}"
     stored_path = upload_to_supabase(
@@ -100,6 +109,20 @@ async def upload_image(
         status="uploaded",
     )
     db.add(image)
+    db.flush()
+
+    metadata_symptoms = [item.strip() for item in (symptoms or "").split(",") if item.strip()]
+    if region or farm or variety or metadata_symptoms:
+        db.add(
+            ClinicalMetadata(
+                image_id=image.id,
+                region=region.strip() if region else None,
+                farm=farm.strip() if farm else None,
+                variety=variety.strip() if variety else None,
+                symptoms=metadata_symptoms,
+            )
+        )
+
     db.commit()
     db.refresh(image)
     return image
@@ -107,6 +130,7 @@ async def upload_image(
 
 def dataset_record_from_image(image: LeafImage) -> DatasetRecordResponse:
     annotations = image.annotations
+    clinical_metadata = image.clinical_metadata
     diagnosis_counts = Counter(annotation.deficiency for annotation in annotations)
     top_items = diagnosis_counts.most_common()
     top_count = top_items[0][1] if top_items else 0
@@ -114,17 +138,23 @@ def dataset_record_from_image(image: LeafImage) -> DatasetRecordResponse:
     consensus = (top_count / len(annotations)) if len(annotations) >= 2 else 0
     expert_validated = len(annotations) >= MIN_ANNOTATIONS_FOR_CONSENSUS and not has_tie and consensus >= CONSENSUS_VALIDATION_THRESHOLD
     final_diagnosis = top_items[0][0] if expert_validated else None
+    image_path = image.processed_path or image.original_path
 
     return DatasetRecordResponse(
         image_id=image.id,
         specimen_code=image.specimen_code,
         original_path=image.original_path,
         processed_path=image.processed_path,
+        preview_url=create_signed_url(settings, image_path),
         status=image.status,
         annotations=len(annotations),
         consensus=consensus,
         expert_validated=expert_validated,
         final_diagnosis=final_diagnosis,
+        region=clinical_metadata.region if clinical_metadata else None,
+        farm=clinical_metadata.farm if clinical_metadata else None,
+        variety=clinical_metadata.variety if clinical_metadata else None,
+        metadata_symptoms=clinical_metadata.symptoms if clinical_metadata else [],
         width=image.width,
         height=image.height,
         color_mode=image.color_mode,
@@ -152,9 +182,8 @@ def get_pending_image(
     if image is None:
         return None
 
-    image_path = image.processed_path or image.original_path
     record = dataset_record_from_image(image)
-    return PendingImageResponse(**record.model_dump(), preview_url=create_signed_url(settings, image_path))
+    return PendingImageResponse(**record.model_dump())
 
 
 @app.get("/images/{image_id}/signed-url", response_model=dict[str, str])
@@ -217,7 +246,8 @@ def create_annotation(payload: AnnotationCreate, db: Session = Depends(get_db)) 
     if existing_annotation is not None:
         raise HTTPException(status_code=409, detail="Expert already annotated this image")
 
-    annotation = Annotation(**payload.model_dump())
+    annotation_data = payload.model_dump(exclude={"consensus", "expert_validated"})
+    annotation = Annotation(**annotation_data, consensus=0, expert_validated=False)
     db.add(annotation)
     db.commit()
     db.refresh(annotation)
@@ -246,6 +276,28 @@ def create_annotation(payload: AnnotationCreate, db: Session = Depends(get_db)) 
 def list_dataset(db: Session = Depends(get_db)) -> list[DatasetRecordResponse]:
     images = db.scalars(select(LeafImage)).all()
     return [dataset_record_from_image(image) for image in images]
+
+
+@app.get("/dataset/metrics", response_model=DatasetMetricsResponse)
+def get_dataset_metrics(db: Session = Depends(get_db)) -> DatasetMetricsResponse:
+    images = db.scalars(select(LeafImage)).all()
+    experts = db.scalars(select(Expert)).all()
+    annotations = db.scalars(select(Annotation)).all()
+    records = [dataset_record_from_image(image) for image in images]
+    conflict_count = sum(
+        1
+        for record in records
+        if record.annotations >= MIN_ANNOTATIONS_FOR_CONSENSUS and not record.expert_validated
+    )
+
+    return DatasetMetricsResponse(
+        images=len(images),
+        experts=len(experts),
+        active_experts=len({annotation.expert_id for annotation in annotations}),
+        validated=sum(1 for record in records if record.expert_validated),
+        conflicts=conflict_count,
+        pending=sum(1 for record in records if record.annotations < MIN_ANNOTATIONS_FOR_CONSENSUS),
+    )
 
 
 @app.get("/dataset/export/jsonl", response_model=list[JsonlRecord])
