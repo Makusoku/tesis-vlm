@@ -13,12 +13,26 @@ const severities: Severity[] = ["Leve", "Moderada", "Severa", "Critica"];
 const qualities: ImageQuality[] = ["Alta", "Media", "Baja"];
 const zoomLevels = [1, 1.5, 2];
 const contrastLevels = [1, 1.25, 1.5];
+const localAnnotatedImagesKey = "agrocafellm-annotated-image-ids";
 
 interface ExpertJudgmentViewProps {
   expertName: string;
   expertAliases?: string[];
   pendingImage?: ApiPendingImage | null;
   apiError?: string | null;
+}
+
+function getLocalAnnotatedImageIds() {
+  try {
+    return JSON.parse(window.localStorage.getItem(localAnnotatedImagesKey) ?? "[]") as string[];
+  } catch {
+    return [];
+  }
+}
+
+function rememberLocalAnnotatedImageId(imageId: string) {
+  const nextIds = Array.from(new Set([...getLocalAnnotatedImageIds(), imageId]));
+  window.localStorage.setItem(localAnnotatedImagesKey, JSON.stringify(nextIds));
 }
 
 export function ExpertJudgmentView({
@@ -66,7 +80,12 @@ export function ExpertJudgmentView({
   const loadPendingImage = useCallback(async () => {
     setIsLoadingImage(true);
     try {
-      const nextPendingImage = await fetchPendingImage(expertName, "Analista agronómico", expertAliases);
+      const nextPendingImage = await fetchPendingImage(
+        expertName,
+        "Analista agronómico",
+        expertAliases,
+        getLocalAnnotatedImageIds()
+      );
       setCurrentPendingImage(nextPendingImage);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "No se pudo actualizar la cola de imágenes.");
@@ -165,6 +184,7 @@ export function ExpertJudgmentView({
         clinical_description: clinicalDescription,
       });
 
+      rememberLocalAnnotatedImageId(currentPendingImage.image_id);
       setMessage("Juicio experto guardado correctamente.");
       await loadPendingImage();
     } catch (error) {

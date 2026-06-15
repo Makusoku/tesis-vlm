@@ -209,18 +209,21 @@ def dataset_record_from_image(image: LeafImage) -> DatasetRecordResponse:
 def get_pending_image(
     expert_name: str | None = None,
     expert_alias: list[str] = Query(default=[]),
+    exclude_image_id: list[str] = Query(default=[]),
     role: str = DEFAULT_EXPERT_ROLE,
     db: Session = Depends(get_db),
 ) -> PendingImageResponse | None:
     expert_names = compact_identity_values(expert_name, *expert_alias)
     experts = find_expert_records(expert_names, role, db)
     expert_ids = {expert.id for expert in experts}
+    excluded_image_ids = {image_id for image_id in exclude_image_id if image_id}
     images = db.scalars(select(LeafImage).order_by(LeafImage.created_at.asc())).all()
     image = next(
         (
             item
             for item in images
-            if len(item.annotations) < MIN_ANNOTATIONS_FOR_CONSENSUS
+            if item.id not in excluded_image_ids
+            and len(item.annotations) < MIN_ANNOTATIONS_FOR_CONSENSUS
             and (not expert_names or all(annotation.expert_id not in expert_ids for annotation in item.annotations))
         ),
         None,

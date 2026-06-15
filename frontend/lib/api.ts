@@ -102,7 +102,8 @@ export async function fetchDatasetMetrics(): Promise<ApiDatasetMetrics> {
 export async function fetchPendingImage(
   expertName?: string,
   role = "Analista agronómico",
-  expertAliases: string[] = []
+  expertAliases: string[] = [],
+  excludedImageIds: string[] = []
 ): Promise<ApiPendingImage | null> {
   const params = new URLSearchParams();
   if (expertName) {
@@ -112,6 +113,11 @@ export async function fetchPendingImage(
   expertAliases.forEach((alias) => {
     if (alias.trim()) {
       params.append("expert_alias", alias);
+    }
+  });
+  excludedImageIds.forEach((imageId) => {
+    if (imageId.trim()) {
+      params.append("exclude_image_id", imageId);
     }
   });
 
