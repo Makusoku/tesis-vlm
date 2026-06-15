@@ -27,7 +27,7 @@ export function ExpertJudgmentView({
   pendingImage = null,
   apiError = null,
 }: ExpertJudgmentViewProps) {
-  const [currentPendingImage, setCurrentPendingImage] = useState<ApiPendingImage | null>(pendingImage);
+  const [currentPendingImage, setCurrentPendingImage] = useState<ApiPendingImage | null>(null);
   const [selectedDeficiency, setSelectedDeficiency] = useState<Deficiency>("Magnesio (Mg)");
   const [severity, setSeverity] = useState<Severity>("Moderada");
   const [quality, setQuality] = useState<ImageQuality>("Alta");
@@ -76,8 +76,9 @@ export function ExpertJudgmentView({
   }, [expertAliases, expertName]);
 
   useEffect(() => {
-    setCurrentPendingImage(pendingImage);
-  }, [pendingImage]);
+    setCurrentPendingImage(null);
+    void loadPendingImage();
+  }, [loadPendingImage]);
 
   useEffect(() => {
     window.addEventListener("agrocafellm:image-uploaded", loadPendingImage);
