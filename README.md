@@ -68,3 +68,89 @@ Politica de imagenes:
 - `processed/`: imagen 512x512 en JPEG, RGB, calidad 85, manteniendo proporcion y agregando padding para no deformar sintomas foliares.
 
 La interfaz ya consume datos reales del backend para cola de imagenes, dataset, metricas y exportaciones. Los catalogos de deficiencias y sintomas siguen siendo listas locales de apoyo para acelerar la anotacion experta.
+
+## Despliegue
+
+Arquitectura recomendada:
+
+```txt
+frontend/  -> Vercel
+backend/   -> Railway
+PostgreSQL -> Supabase
+Storage    -> Supabase Storage
+Auth       -> Kinde
+```
+
+### Backend en Railway
+
+Crear un servicio desde GitHub apuntando al directorio `backend/`.
+
+Railway puede usar `backend/railway.json`. Si configuras manualmente:
+
+```bash
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port $PORT
+```
+
+Variables necesarias en Railway:
+
+```env
+DATABASE_URL=postgresql://postgres:password@db.project.supabase.co:5432/postgres
+SUPABASE_URL=https://project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=replace_with_your_supabase_secret_key
+SUPABASE_STORAGE_BUCKET=leaf-images
+UPLOAD_DIR=/tmp/uploads
+PROCESSED_DIR=/tmp/processed
+CORS_ORIGINS=https://your-frontend.vercel.app
+```
+
+Verificacion:
+
+```txt
+GET https://your-backend.up.railway.app/health
+```
+
+### Frontend en Vercel
+
+Crear un proyecto desde GitHub apuntando al directorio `frontend/`.
+
+Variables necesarias en Vercel:
+
+```env
+KINDE_CLIENT_ID=replace_with_your_kinde_client_id
+KINDE_CLIENT_SECRET=replace_with_your_kinde_client_secret
+KINDE_ISSUER_URL=https://agrocafellm.kinde.com
+KINDE_SITE_URL=https://your-frontend.vercel.app
+KINDE_POST_LOGOUT_REDIRECT_URL=https://your-frontend.vercel.app/login
+KINDE_POST_LOGIN_REDIRECT_URL=https://your-frontend.vercel.app/juicio-experto
+NEXT_PUBLIC_APP_URL=https://your-frontend.vercel.app
+NEXT_PUBLIC_API_URL=https://your-backend.up.railway.app
+```
+
+### Kinde
+
+En la aplicacion de Kinde, agregar:
+
+```txt
+Allowed callback URLs:
+https://your-frontend.vercel.app/api/auth/kinde_callback
+
+Allowed logout redirect URLs:
+https://your-frontend.vercel.app/login
+https://your-frontend.vercel.app
+
+Application login URI:
+https://your-frontend.vercel.app/api/auth/login
+```
+
+### Checklist post-deploy
+
+- Abrir `/health` del backend.
+- Iniciar sesion desde `/login`.
+- Subir una imagen foliar.
+- Confirmar que se crea el objeto en Supabase Storage.
+- Confirmar que `leaf_images` y `clinical_metadata` reciben registros.
+- Guardar un juicio experto.
+- Revisar `/dataset` y exportacion JSONL.
+
+Pendiente antes de produccion publica: proteger el backend con JWT/Audience de Kinde para rechazar llamadas no autenticadas directas a la API.
