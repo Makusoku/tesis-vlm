@@ -1,6 +1,9 @@
 import { DatasetView } from "@/features/dataset/dataset-view";
 import { fetchDatasetMetrics, fetchDatasetRecords, fetchJsonlRecords } from "@/lib/api";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function DatasetPage() {
   try {
     const [records, jsonlRecords, metrics] = await Promise.all([fetchDatasetRecords(), fetchJsonlRecords(), fetchDatasetMetrics()]);

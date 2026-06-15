@@ -96,6 +96,7 @@ export function Sidebar({ user }: SidebarProps) {
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch={false}
                 className={`grid h-14 shrink-0 grid-cols-[3rem_1fr] items-center overflow-hidden rounded-2xl px-0 text-sm transition-all duration-300 ease-out ${
                   mode === "mobile" ? "w-full" : expanded ? "w-72" : "w-12"
                 } ${

@@ -1,5 +1,6 @@
 from collections import Counter
 from pathlib import Path
+from unicodedata import combining, normalize
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -51,8 +52,40 @@ def health() -> dict[str, str]:
     }
 
 
+DEFAULT_EXPERT_ROLE = "Analista agronómico"
+
+
+def normalize_identity(value: str | None) -> str:
+    normalized = normalize("NFKD", value or "")
+    without_accents = "".join(char for char in normalized if not combining(char))
+    return " ".join(without_accents.casefold().split())
+
+
+def find_expert_record(name: str | None, role: str | None, db: Session) -> Expert | None:
+    if not name:
+        return None
+
+    exact = db.scalar(select(Expert).where(Expert.name == name, Expert.role == role))
+    if exact is not None:
+        return exact
+
+    normalized_name = normalize_identity(name)
+    normalized_role = normalize_identity(role)
+    experts = db.scalars(select(Expert)).all()
+
+    for expert in experts:
+        if normalize_identity(expert.name) == normalized_name and normalize_identity(expert.role) == normalized_role:
+            return expert
+
+    for expert in experts:
+        if normalize_identity(expert.name) == normalized_name:
+            return expert
+
+    return None
+
+
 @app.post("/experts", response_model=dict[str, str])
-def create_expert(name: str, role: str = "Analista Agronomico", db: Session = Depends(get_db)) -> dict[str, str]:
+def create_expert(name: str, role: str = DEFAULT_EXPERT_ROLE, db: Session = Depends(get_db)) -> dict[str, str]:
     expert = Expert(name=name, role=role)
     db.add(expert)
     db.commit()
@@ -66,7 +99,7 @@ def ensure_expert(payload: ExpertEnsure, db: Session = Depends(get_db)) -> Exper
 
 
 def ensure_expert_record(name: str, role: str, db: Session) -> Expert:
-    expert = db.scalar(select(Expert).where(Expert.name == name, Expert.role == role))
+    expert = find_expert_record(name, role, db)
     if expert is not None:
         return expert
 
@@ -165,10 +198,10 @@ def dataset_record_from_image(image: LeafImage) -> DatasetRecordResponse:
 @app.get("/images/pending", response_model=PendingImageResponse | None)
 def get_pending_image(
     expert_name: str | None = None,
-    role: str = "Analista agronómico",
+    role: str = DEFAULT_EXPERT_ROLE,
     db: Session = Depends(get_db),
 ) -> PendingImageResponse | None:
-    expert = db.scalar(select(Expert).where(Expert.name == expert_name, Expert.role == role)) if expert_name else None
+    expert = find_expert_record(expert_name, role, db)
     images = db.scalars(select(LeafImage).order_by(LeafImage.created_at.asc())).all()
     image = next(
         (

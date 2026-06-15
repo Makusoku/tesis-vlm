@@ -2,6 +2,9 @@ import { getKindeServerSession } from "@kinde-oss/kinde-auth-nextjs/server";
 import { ExpertJudgmentView } from "@/features/expert-judgment/expert-judgment-view";
 import { fetchPendingImage } from "@/lib/api";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function ExpertJudgmentPage() {
   const { getUser } = getKindeServerSession();
   const kindeUser = await getUser();
