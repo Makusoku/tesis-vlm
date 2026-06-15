@@ -17,11 +17,17 @@ const contrastLevels = [1, 1.25, 1.5];
 
 interface ExpertJudgmentViewProps {
   expertName: string;
+  expertAliases?: string[];
   pendingImage?: ApiPendingImage | null;
   apiError?: string | null;
 }
 
-export function ExpertJudgmentView({ expertName, pendingImage = null, apiError = null }: ExpertJudgmentViewProps) {
+export function ExpertJudgmentView({
+  expertName,
+  expertAliases = [],
+  pendingImage = null,
+  apiError = null,
+}: ExpertJudgmentViewProps) {
   const router = useRouter();
   const [selectedDeficiency, setSelectedDeficiency] = useState<Deficiency>("Magnesio (Mg)");
   const [severity, setSeverity] = useState<Severity>("Moderada");
@@ -120,7 +126,7 @@ export function ExpertJudgmentView({ expertName, pendingImage = null, apiError =
     setMessage(null);
 
     try {
-      const expert = await ensureExpert(expertName);
+      const expert = await ensureExpert(expertName, "Analista agronómico", expertAliases);
       await createAnnotation({
         image_id: pendingImage.image_id,
         expert_id: expert.id,

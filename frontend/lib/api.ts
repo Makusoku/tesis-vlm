@@ -99,12 +99,21 @@ export async function fetchDatasetMetrics(): Promise<ApiDatasetMetrics> {
   return response.json();
 }
 
-export async function fetchPendingImage(expertName?: string, role = "Analista agronómico"): Promise<ApiPendingImage | null> {
+export async function fetchPendingImage(
+  expertName?: string,
+  role = "Analista agronómico",
+  expertAliases: string[] = []
+): Promise<ApiPendingImage | null> {
   const params = new URLSearchParams();
   if (expertName) {
     params.set("expert_name", expertName);
     params.set("role", role);
   }
+  expertAliases.forEach((alias) => {
+    if (alias.trim()) {
+      params.append("expert_alias", alias);
+    }
+  });
 
   const query = params.toString();
   const response = await fetch(`${getApiBaseUrl()}/images/pending${query ? `?${query}` : ""}`, {
@@ -118,13 +127,13 @@ export async function fetchPendingImage(expertName?: string, role = "Analista ag
   return response.json();
 }
 
-export async function ensureExpert(name: string, role = "Analista agronómico"): Promise<ApiExpert> {
+export async function ensureExpert(name: string, role = "Analista agronómico", aliases: string[] = []): Promise<ApiExpert> {
   const response = await fetch(`${getApiBaseUrl()}/experts/ensure`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ name, role }),
+    body: JSON.stringify({ name, role, aliases }),
   });
 
   if (!response.ok) {

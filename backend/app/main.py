@@ -2,7 +2,7 @@ from collections import Counter
 from pathlib import Path
 from unicodedata import combining, normalize
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -61,27 +61,41 @@ def normalize_identity(value: str | None) -> str:
     return " ".join(without_accents.casefold().split())
 
 
-def find_expert_record(name: str | None, role: str | None, db: Session) -> Expert | None:
-    if not name:
-        return None
+def compact_identity_values(*values: str | None) -> list[str]:
+    seen: set[str] = set()
+    compacted: list[str] = []
+    for value in values:
+        trimmed = (value or "").strip()
+        normalized = normalize_identity(trimmed)
+        if trimmed and normalized not in seen:
+            seen.add(normalized)
+            compacted.append(trimmed)
+    return compacted
 
-    exact = db.scalar(select(Expert).where(Expert.name == name, Expert.role == role))
-    if exact is not None:
-        return exact
 
-    normalized_name = normalize_identity(name)
+def find_expert_records(names: list[str], role: str | None, db: Session) -> list[Expert]:
+    identities = {normalize_identity(name) for name in names if normalize_identity(name)}
+    if not identities:
+        return []
+
     normalized_role = normalize_identity(role)
     experts = db.scalars(select(Expert)).all()
+    matches_with_role = [
+        expert
+        for expert in experts
+        if normalize_identity(expert.name) in identities and normalize_identity(expert.role) == normalized_role
+    ]
+    if matches_with_role:
+        return matches_with_role
 
-    for expert in experts:
-        if normalize_identity(expert.name) == normalized_name and normalize_identity(expert.role) == normalized_role:
-            return expert
+    return [expert for expert in experts if normalize_identity(expert.name) in identities]
 
-    for expert in experts:
-        if normalize_identity(expert.name) == normalized_name:
-            return expert
 
-    return None
+def find_expert_record(name: str | None, role: str | None, db: Session) -> Expert | None:
+    matches = find_expert_records([name] if name else [], role, db)
+    if not matches:
+        return None
+    return matches[0]
 
 
 @app.post("/experts", response_model=dict[str, str])
@@ -95,13 +109,14 @@ def create_expert(name: str, role: str = DEFAULT_EXPERT_ROLE, db: Session = Depe
 
 @app.post("/experts/ensure", response_model=ExpertResponse)
 def ensure_expert(payload: ExpertEnsure, db: Session = Depends(get_db)) -> Expert:
-    return ensure_expert_record(payload.name, payload.role, db)
+    return ensure_expert_record(payload.name, payload.role, db, payload.aliases)
 
 
-def ensure_expert_record(name: str, role: str, db: Session) -> Expert:
-    expert = find_expert_record(name, role, db)
-    if expert is not None:
-        return expert
+def ensure_expert_record(name: str, role: str, db: Session, aliases: list[str] | None = None) -> Expert:
+    names = compact_identity_values(name, *(aliases or []))
+    experts = find_expert_records(names, role, db)
+    if experts:
+        return experts[0]
 
     expert = Expert(name=name, role=role)
     db.add(expert)
@@ -198,17 +213,20 @@ def dataset_record_from_image(image: LeafImage) -> DatasetRecordResponse:
 @app.get("/images/pending", response_model=PendingImageResponse | None)
 def get_pending_image(
     expert_name: str | None = None,
+    expert_alias: list[str] = Query(default=[]),
     role: str = DEFAULT_EXPERT_ROLE,
     db: Session = Depends(get_db),
 ) -> PendingImageResponse | None:
-    expert = find_expert_record(expert_name, role, db)
+    expert_names = compact_identity_values(expert_name, *expert_alias)
+    experts = find_expert_records(expert_names, role, db)
+    expert_ids = {expert.id for expert in experts}
     images = db.scalars(select(LeafImage).order_by(LeafImage.created_at.asc())).all()
     image = next(
         (
             item
             for item in images
             if len(item.annotations) < MIN_ANNOTATIONS_FOR_CONSENSUS
-            and (expert is None or all(annotation.expert_id != expert.id for annotation in item.annotations))
+            and (not expert_names or all(annotation.expert_id not in expert_ids for annotation in item.annotations))
         ),
         None,
     )

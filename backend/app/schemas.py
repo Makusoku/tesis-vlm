@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 class ExpertEnsure(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     role: str = Field(default="Analista agronómico", min_length=1, max_length=120)
+    aliases: list[str] = Field(default_factory=list)
 
 
 class ExpertResponse(BaseModel):
