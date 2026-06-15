@@ -80,15 +80,10 @@ def find_expert_records(names: list[str], role: str | None, db: Session) -> list
 
     normalized_role = normalize_identity(role)
     experts = db.scalars(select(Expert)).all()
-    matches_with_role = [
-        expert
-        for expert in experts
-        if normalize_identity(expert.name) in identities and normalize_identity(expert.role) == normalized_role
-    ]
-    if matches_with_role:
-        return matches_with_role
-
-    return [expert for expert in experts if normalize_identity(expert.name) in identities]
+    matches = [expert for expert in experts if normalize_identity(expert.name) in identities]
+    matches_with_role = [expert for expert in matches if normalize_identity(expert.role) == normalized_role]
+    matches_with_other_role = [expert for expert in matches if expert.id not in {item.id for item in matches_with_role}]
+    return matches_with_role + matches_with_other_role
 
 
 def find_expert_record(name: str | None, role: str | None, db: Session) -> Expert | None:

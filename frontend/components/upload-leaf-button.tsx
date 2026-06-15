@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { UploadIcon, XIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { getApiBaseUrl } from "@/lib/api";
@@ -20,7 +19,6 @@ function defaultSpecimenCode() {
 }
 
 export function UploadLeafButton() {
-  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -102,7 +100,7 @@ export function UploadLeafButton() {
       setMessage("Imagen subida y preprocesada");
       setIsOpen(false);
       resetForm();
-      router.refresh();
+      window.dispatchEvent(new CustomEvent("agrocafellm:image-uploaded", { detail: { imageId: image.id } }));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "No se pudo subir la imagen");
     } finally {

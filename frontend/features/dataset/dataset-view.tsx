@@ -1,11 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertIcon, CheckIcon, DatabaseIcon, ImageIcon, UserIcon } from "@/components/icons";
 import { StatCard } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import type { ApiDatasetMetrics, ApiDatasetRecord, ApiJsonlRecord } from "@/lib/api";
+import {
+  fetchDatasetMetrics,
+  fetchDatasetRecords,
+  fetchJsonlRecords,
+  type ApiDatasetMetrics,
+  type ApiDatasetRecord,
+  type ApiJsonlRecord,
+} from "@/lib/api";
 
 const requiredAnnotations = 4;
 
@@ -42,13 +49,16 @@ interface DatasetViewProps {
 }
 
 export function DatasetView({ records = [], jsonlRecords = [], metrics = null, apiError = null }: DatasetViewProps) {
+  const [datasetRecords, setDatasetRecords] = useState(records);
+  const [datasetJsonlRecords, setDatasetJsonlRecords] = useState(jsonlRecords);
+  const [datasetMetrics, setDatasetMetrics] = useState(metrics);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<DatasetFilter>("all");
-  const hasRecords = records.length > 0;
+  const hasRecords = datasetRecords.length > 0;
   const filteredRecords = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
-    return records.filter((record) => {
+    return datasetRecords.filter((record) => {
       const metadataText = [record.region, record.farm, record.variety, ...(record.metadata_symptoms ?? [])]
         .filter(Boolean)
         .join(" ")
@@ -69,13 +79,36 @@ export function DatasetView({ records = [], jsonlRecords = [], metrics = null, a
 
       return matchesQuery && matchesFilter;
     });
-  }, [filter, query, records]);
+  }, [datasetRecords, filter, query]);
 
-  const readyRecords = metrics?.validated ?? records.filter((record) => record.expert_validated).length;
+  const readyRecords = datasetMetrics?.validated ?? datasetRecords.filter((record) => record.expert_validated).length;
   const conflictRecords =
-    metrics?.conflicts ?? records.filter((record) => record.annotations >= requiredAnnotations && !record.expert_validated).length;
-  const pendingRecords = metrics?.pending ?? records.filter((record) => record.annotations < requiredAnnotations).length;
-  const jsonlExample = jsonlRecords[0] ?? null;
+    datasetMetrics?.conflicts ??
+    datasetRecords.filter((record) => record.annotations >= requiredAnnotations && !record.expert_validated).length;
+  const pendingRecords = datasetMetrics?.pending ?? datasetRecords.filter((record) => record.annotations < requiredAnnotations).length;
+  const jsonlExample = datasetJsonlRecords[0] ?? null;
+
+  useEffect(() => {
+    setDatasetRecords(records);
+    setDatasetJsonlRecords(jsonlRecords);
+    setDatasetMetrics(metrics);
+  }, [jsonlRecords, metrics, records]);
+
+  useEffect(() => {
+    async function refreshDataset() {
+      const [nextRecords, nextJsonlRecords, nextMetrics] = await Promise.all([
+        fetchDatasetRecords(),
+        fetchJsonlRecords(),
+        fetchDatasetMetrics(),
+      ]);
+      setDatasetRecords(nextRecords);
+      setDatasetJsonlRecords(nextJsonlRecords);
+      setDatasetMetrics(nextMetrics);
+    }
+
+    window.addEventListener("agrocafellm:image-uploaded", refreshDataset);
+    return () => window.removeEventListener("agrocafellm:image-uploaded", refreshDataset);
+  }, []);
 
   function downloadText(filename: string, content: string, type = "application/json") {
     const blob = new Blob([content], { type });
@@ -89,7 +122,7 @@ export function DatasetView({ records = [], jsonlRecords = [], metrics = null, a
 
   function handleExport(formatId: string) {
     if (formatId === "jsonl") {
-      const lines = jsonlRecords.map((record) => JSON.stringify(record)).join("\n");
+      const lines = datasetJsonlRecords.map((record) => JSON.stringify(record)).join("\n");
       downloadText("agrocafellm-dataset.jsonl", lines ? `${lines}\n` : "", "application/x-ndjson");
       return;
     }
@@ -97,7 +130,7 @@ export function DatasetView({ records = [], jsonlRecords = [], metrics = null, a
     if (formatId === "csv") {
       const header =
         "image_id,specimen_code,status,annotations,consensus,expert_validated,final_diagnosis,region,farm,variety,width,height\n";
-      const rows = records
+      const rows = datasetRecords
         .map((record) =>
           [
             record.image_id,
@@ -123,7 +156,7 @@ export function DatasetView({ records = [], jsonlRecords = [], metrics = null, a
 
     downloadText(
       formatId === "llava" ? "agrocafellm-llava.json" : "agrocafellm-dataset.json",
-      JSON.stringify(records, null, 2)
+      JSON.stringify(datasetRecords, null, 2)
     );
   }
 
@@ -139,14 +172,14 @@ export function DatasetView({ records = [], jsonlRecords = [], metrics = null, a
         <StatCard
           icon={ImageIcon}
           label="Imágenes cargadas"
-          value={String(metrics?.images ?? records.length)}
+          value={String(datasetMetrics?.images ?? datasetRecords.length)}
           sub={`${pendingRecords} pendientes`}
         />
         <StatCard
           icon={UserIcon}
           label="Expertos activos"
-          value={String(metrics?.active_experts ?? 0)}
-          sub={`${metrics?.experts ?? 0} registrados`}
+          value={String(datasetMetrics?.active_experts ?? 0)}
+          sub={`${datasetMetrics?.experts ?? 0} registrados`}
         />
         <StatCard icon={CheckIcon} label="Registros validados" value={String(readyRecords)} sub="con consenso suficiente" />
         <StatCard icon={AlertIcon} label="Casos conflictivos" value={String(conflictRecords)} sub="sin consenso suficiente" />
@@ -167,7 +200,7 @@ export function DatasetView({ records = [], jsonlRecords = [], metrics = null, a
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {exportFormats.map((format) => {
-                const disabled = format.id === "jsonl" ? jsonlRecords.length === 0 : !hasRecords;
+                const disabled = format.id === "jsonl" ? datasetJsonlRecords.length === 0 : !hasRecords;
 
                 return (
                   <div key={format.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
@@ -176,7 +209,7 @@ export function DatasetView({ records = [], jsonlRecords = [], metrics = null, a
                     <p className="mt-1 min-h-10 text-xs text-slate-500">{format.description}</p>
                     <div className="mt-4 flex items-center justify-between gap-3">
                       <span className="text-xs font-semibold text-slate-500">
-                        {format.id === "jsonl" ? jsonlRecords.length : records.length} registros
+                        {format.id === "jsonl" ? datasetJsonlRecords.length : datasetRecords.length} registros
                       </span>
                       <Button variant="outline" className="px-3" onClick={() => handleExport(format.id)} disabled={disabled}>
                         Exportar

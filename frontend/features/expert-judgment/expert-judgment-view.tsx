@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 import { deficiencies, symptomCatalog } from "@/lib/mock-data";
 import type { Deficiency, ImageQuality, Severity } from "@/lib/types";
 import type { ApiPendingImage } from "@/lib/api";
-import { createAnnotation, ensureExpert } from "@/lib/api";
+import { createAnnotation, ensureExpert, fetchPendingImage } from "@/lib/api";
 import { ArrowRightIcon, ClipboardIcon, ImageIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,7 +27,7 @@ export function ExpertJudgmentView({
   pendingImage = null,
   apiError = null,
 }: ExpertJudgmentViewProps) {
-  const router = useRouter();
+  const [currentPendingImage, setCurrentPendingImage] = useState<ApiPendingImage | null>(pendingImage);
   const [selectedDeficiency, setSelectedDeficiency] = useState<Deficiency>("Magnesio (Mg)");
   const [severity, setSeverity] = useState<Severity>("Moderada");
   const [quality, setQuality] = useState<ImageQuality>("Alta");
@@ -47,15 +46,43 @@ export function ExpertJudgmentView({
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dragStart, setDragStart] = useState<{ pointerId: number; x: number; y: number; panX: number; panY: number } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingImage, setIsLoadingImage] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const imageSrc = pendingImage?.preview_url;
-  const specimenCode = pendingImage?.specimen_code ?? "Sin imagen asignada";
-  const imageStatus = pendingImage ? "Pendiente de juicio experto" : apiError ? "Backend no disponible" : "Sin imagen pendiente";
-  const canSave = Boolean(pendingImage);
+  const imageSrc = currentPendingImage?.preview_url;
+  const specimenCode = currentPendingImage?.specimen_code ?? "Sin imagen asignada";
+  const imageStatus = currentPendingImage
+    ? "Pendiente de juicio experto"
+    : isLoadingImage
+      ? "Actualizando cola"
+      : apiError
+        ? "Backend no disponible"
+        : "Sin imagen pendiente";
+  const canSave = Boolean(currentPendingImage);
   const zoom = zoomLevels[zoomIndex];
   const contrast = contrastLevels[contrastIndex];
   const canPan = zoom > 1;
+
+  const loadPendingImage = useCallback(async () => {
+    setIsLoadingImage(true);
+    try {
+      const nextPendingImage = await fetchPendingImage(expertName, "Analista agronómico", expertAliases);
+      setCurrentPendingImage(nextPendingImage);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo actualizar la cola de imágenes.");
+    } finally {
+      setIsLoadingImage(false);
+    }
+  }, [expertAliases, expertName]);
+
+  useEffect(() => {
+    setCurrentPendingImage(pendingImage);
+  }, [pendingImage]);
+
+  useEffect(() => {
+    window.addEventListener("agrocafellm:image-uploaded", loadPendingImage);
+    return () => window.removeEventListener("agrocafellm:image-uploaded", loadPendingImage);
+  }, [loadPendingImage]);
 
   function toggleSymptom(symptom: string) {
     setSelectedSymptoms((current) =>
@@ -106,7 +133,7 @@ export function ExpertJudgmentView({
   }
 
   async function handleSave() {
-    if (!pendingImage) {
+    if (!currentPendingImage) {
       setMessage("No hay una imagen pendiente real para anotar.");
       return;
     }
@@ -128,7 +155,7 @@ export function ExpertJudgmentView({
     try {
       const expert = await ensureExpert(expertName, "Analista agronómico", expertAliases);
       await createAnnotation({
-        image_id: pendingImage.image_id,
+        image_id: currentPendingImage.image_id,
         expert_id: expert.id,
         deficiency: selectedDeficiency,
         severity,
@@ -138,7 +165,7 @@ export function ExpertJudgmentView({
       });
 
       setMessage("Juicio experto guardado correctamente.");
-      router.refresh();
+      await loadPendingImage();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "No se pudo guardar el juicio experto.");
     } finally {
