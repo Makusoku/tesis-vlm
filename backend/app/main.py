@@ -4,8 +4,9 @@ from unicodedata import combining, normalize
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, selectinload
 
 from .config import get_settings
 from .database import Base, engine, get_db
@@ -134,6 +135,10 @@ async def upload_image(
     if not specimen_code:
         raise HTTPException(status_code=422, detail="Specimen code is required")
 
+    existing_image = db.scalar(select(LeafImage).where(LeafImage.specimen_code == specimen_code))
+    if existing_image is not None:
+        raise HTTPException(status_code=409, detail="Specimen code already exists")
+
     original_path, metadata = await save_upload(file, settings.upload_dir)
     object_key = f"raw/{specimen_code}/{original_path.name}"
     stored_path = upload_to_supabase(
@@ -166,21 +171,39 @@ async def upload_image(
             )
         )
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Specimen code already exists") from exc
     db.refresh(image)
     return image
 
 
-def dataset_record_from_image(image: LeafImage) -> DatasetRecordResponse:
-    annotations = image.annotations
-    clinical_metadata = image.clinical_metadata
+def evaluate_consensus(annotations: list[Annotation]) -> tuple[int, float, bool, str | None]:
+    """Single source of truth for consensus. Returns (count, consensus, validated, final_diagnosis)."""
+    count = len(annotations)
     diagnosis_counts = Counter(annotation.deficiency for annotation in annotations)
     top_items = diagnosis_counts.most_common()
     top_count = top_items[0][1] if top_items else 0
     has_tie = len(top_items) > 1 and top_items[1][1] == top_count
-    consensus = (top_count / len(annotations)) if len(annotations) >= 2 else 0
-    expert_validated = len(annotations) >= MIN_ANNOTATIONS_FOR_CONSENSUS and not has_tie and consensus >= CONSENSUS_VALIDATION_THRESHOLD
+    consensus = (top_count / count) if count >= 2 else 0
+    expert_validated = count >= MIN_ANNOTATIONS_FOR_CONSENSUS and not has_tie and consensus >= CONSENSUS_VALIDATION_THRESHOLD
     final_diagnosis = top_items[0][0] if expert_validated else None
+    return count, consensus, expert_validated, final_diagnosis
+
+
+def safe_preview_url(image_path: str) -> str | None:
+    """Sign a preview URL without letting a single bad Storage object break a whole listing."""
+    try:
+        return create_signed_url(settings, image_path)
+    except HTTPException:
+        return None
+
+
+def dataset_record_from_image(image: LeafImage) -> DatasetRecordResponse:
+    clinical_metadata = image.clinical_metadata
+    annotation_count, consensus, expert_validated, final_diagnosis = evaluate_consensus(image.annotations)
     image_path = image.processed_path or image.original_path
 
     return DatasetRecordResponse(
@@ -188,9 +211,9 @@ def dataset_record_from_image(image: LeafImage) -> DatasetRecordResponse:
         specimen_code=image.specimen_code,
         original_path=image.original_path,
         processed_path=image.processed_path,
-        preview_url=create_signed_url(settings, image_path),
+        preview_url=safe_preview_url(image_path),
         status=image.status,
-        annotations=len(annotations),
+        annotations=annotation_count,
         consensus=consensus,
         expert_validated=expert_validated,
         final_diagnosis=final_diagnosis,
@@ -217,22 +240,26 @@ def get_pending_image(
     experts = find_expert_records(expert_names, role, db)
     expert_ids = {expert.id for expert in experts}
     excluded_image_ids = {image_id for image_id in exclude_image_id if image_id}
-    images = db.scalars(select(LeafImage).order_by(LeafImage.created_at.asc())).all()
-    image = next(
-        (
-            item
-            for item in images
-            if item.id not in excluded_image_ids
-            and len(item.annotations) < MIN_ANNOTATIONS_FOR_CONSENSUS
-            and (not expert_names or all(annotation.expert_id not in expert_ids for annotation in item.annotations))
-        ),
-        None,
-    )
-    if image is None:
-        return None
+    images = db.scalars(
+        select(LeafImage)
+        .options(selectinload(LeafImage.annotations), selectinload(LeafImage.clinical_metadata))
+        .order_by(LeafImage.created_at.asc())
+    ).all()
+    for item in images:
+        if item.id in excluded_image_ids:
+            continue
+        if len(item.annotations) >= MIN_ANNOTATIONS_FOR_CONSENSUS:
+            continue
+        if expert_names and any(annotation.expert_id in expert_ids for annotation in item.annotations):
+            continue
 
-    record = dataset_record_from_image(image)
-    return PendingImageResponse(**record.model_dump())
+        record = dataset_record_from_image(item)
+        if record.preview_url is None:
+            # Sin preview disponible (objeto faltante en Storage): saltar para no bloquear la cola.
+            continue
+        return PendingImageResponse(**record.model_dump())
+
+    return None
 
 
 @app.get("/images/{image_id}/signed-url", response_model=dict[str, str])
@@ -298,20 +325,15 @@ def create_annotation(payload: AnnotationCreate, db: Session = Depends(get_db)) 
     annotation_data = payload.model_dump(exclude={"consensus", "expert_validated"})
     annotation = Annotation(**annotation_data, consensus=0, expert_validated=False)
     db.add(annotation)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Expert already annotated this image") from exc
     db.refresh(annotation)
 
     image_annotations = db.scalars(select(Annotation).where(Annotation.image_id == payload.image_id)).all()
-    diagnosis_counts = Counter(item.deficiency for item in image_annotations)
-    top_items = diagnosis_counts.most_common()
-    top_count = top_items[0][1] if top_items else 0
-    has_tie = len(top_items) > 1 and top_items[1][1] == top_count
-    consensus = (top_count / len(image_annotations)) if len(image_annotations) >= 2 else 0
-    expert_validated = (
-        len(image_annotations) >= MIN_ANNOTATIONS_FOR_CONSENSUS
-        and not has_tie
-        and consensus >= CONSENSUS_VALIDATION_THRESHOLD
-    )
+    _, consensus, expert_validated, _ = evaluate_consensus(image_annotations)
 
     for item in image_annotations:
         item.consensus = consensus
@@ -323,35 +345,44 @@ def create_annotation(payload: AnnotationCreate, db: Session = Depends(get_db)) 
 
 @app.get("/dataset", response_model=list[DatasetRecordResponse])
 def list_dataset(db: Session = Depends(get_db)) -> list[DatasetRecordResponse]:
-    images = db.scalars(select(LeafImage)).all()
+    images = db.scalars(
+        select(LeafImage).options(
+            selectinload(LeafImage.annotations), selectinload(LeafImage.clinical_metadata)
+        )
+    ).all()
     return [dataset_record_from_image(image) for image in images]
 
 
 @app.get("/dataset/metrics", response_model=DatasetMetricsResponse)
 def get_dataset_metrics(db: Session = Depends(get_db)) -> DatasetMetricsResponse:
-    images = db.scalars(select(LeafImage)).all()
-    experts = db.scalars(select(Expert)).all()
-    annotations = db.scalars(select(Annotation)).all()
-    records = [dataset_record_from_image(image) for image in images]
-    conflict_count = sum(
-        1
-        for record in records
-        if record.annotations >= MIN_ANNOTATIONS_FOR_CONSENSUS and not record.expert_validated
-    )
+    # Counts only: no signed URLs, no per-image HTTP round-trips to Storage.
+    images = db.scalars(select(LeafImage).options(selectinload(LeafImage.annotations))).all()
+    experts_total = db.scalar(select(func.count()).select_from(Expert)) or 0
+    active_experts = db.scalar(select(func.count(func.distinct(Annotation.expert_id)))) or 0
+
+    validated = conflicts = pending = 0
+    for image in images:
+        annotation_count, _, expert_validated, _ = evaluate_consensus(image.annotations)
+        if annotation_count < MIN_ANNOTATIONS_FOR_CONSENSUS:
+            pending += 1
+        elif expert_validated:
+            validated += 1
+        else:
+            conflicts += 1
 
     return DatasetMetricsResponse(
         images=len(images),
-        experts=len(experts),
-        active_experts=len({annotation.expert_id for annotation in annotations}),
-        validated=sum(1 for record in records if record.expert_validated),
-        conflicts=conflict_count,
-        pending=sum(1 for record in records if record.annotations < MIN_ANNOTATIONS_FOR_CONSENSUS),
+        experts=experts_total,
+        active_experts=active_experts,
+        validated=validated,
+        conflicts=conflicts,
+        pending=pending,
     )
 
 
 @app.get("/dataset/export/jsonl", response_model=list[JsonlRecord])
 def export_jsonl(db: Session = Depends(get_db)) -> list[JsonlRecord]:
-    annotations = db.scalars(select(Annotation)).all()
+    annotations = db.scalars(select(Annotation).options(selectinload(Annotation.image))).all()
     records: list[JsonlRecord] = []
     for annotation in annotations:
         image_path = annotation.image.processed_path or annotation.image.original_path
