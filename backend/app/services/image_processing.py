@@ -11,6 +11,7 @@ from PIL import Image, UnidentifiedImageError
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 RAW_MAX_SIDE = 1600
 JPEG_QUALITY = 85
+MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 
 
 def resize_max_side(image: Image.Image, max_side: int) -> Image.Image:
@@ -41,9 +42,15 @@ async def save_upload(file: UploadFile, upload_dir: str) -> tuple[Path, dict[str
     if file.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(status_code=415, detail="Only JPEG, PNG, and WEBP images are accepted")
 
+    if file.size is not None and file.size > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Image exceeds the 15 MB limit")
+
     Path(upload_dir).mkdir(parents=True, exist_ok=True)
     target = Path(upload_dir) / f"{uuid4()}.jpg"
     content = await file.read()
+
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Image exceeds the 15 MB limit")
 
     try:
         with Image.open(BytesIO(content)) as image:
@@ -56,7 +63,7 @@ async def save_upload(file: UploadFile, upload_dir: str) -> tuple[Path, dict[str
                 "color_mode": "RGB",
                 "image_format": "JPEG",
             }
-    except UnidentifiedImageError as exc:
+    except (UnidentifiedImageError, Image.DecompressionBombError, OSError, ValueError) as exc:
         target.unlink(missing_ok=True)
         raise HTTPException(status_code=415, detail="Uploaded file is not a valid image") from exc
 
