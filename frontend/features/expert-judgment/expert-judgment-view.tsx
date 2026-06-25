@@ -14,6 +14,9 @@ const qualities: ImageQuality[] = ["Alta", "Media", "Baja"];
 const zoomLevels = [1, 1.5, 2];
 const contrastLevels = [1, 1.25, 1.5];
 const localAnnotatedImagesKey = "agrocafellm-annotated-image-ids";
+// Comodin que usa el servidor cuando no hay identidad real. Nunca debe quedar
+// como autor de una anotacion: mezclaria juicios de distintas personas.
+const guestExpertName = "Experto invitado";
 
 interface ExpertJudgmentViewProps {
   expertName: string;
@@ -165,6 +168,11 @@ export function ExpertJudgmentView({
   async function handleSave() {
     if (!currentPendingImage) {
       setMessage("No hay una imagen pendiente real para anotar.");
+      return;
+    }
+
+    if (!expertName || expertName === guestExpertName) {
+      setMessage("No pudimos identificar tu cuenta. Recargá la página o volvé a iniciar sesión antes de guardar.");
       return;
     }
 
