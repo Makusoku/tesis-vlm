@@ -18,6 +18,9 @@ class Expert(Base):
     id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, default=new_uuid)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     role: Mapped[str] = mapped_column(String(120), nullable=False)
+    # Identidades historicas del experto (id de Kinde, emails, nombre) para
+    # reconciliarlo aunque ingrese con distintas cuentas/metodos de login.
+    aliases: Mapped[list[str]] = mapped_column(ARRAY(String), default=list, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
     annotations: Mapped[list["Annotation"]] = relationship(back_populates="expert")

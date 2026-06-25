@@ -74,6 +74,24 @@ def compact_identity_values(*values: str | None) -> list[str]:
     return compacted
 
 
+def expert_identity_set(expert: Expert) -> set[str]:
+    """Todas las identidades por las que se reconoce a un experto: nombre + alias."""
+    values = [expert.name, *(expert.aliases or [])]
+    return {normalize_identity(value) for value in values if normalize_identity(value)}
+
+
+def union_identity_values(existing: list[str] | None, new_values: list[str]) -> list[str]:
+    """Suma identidades nuevas a las existentes sin duplicar (comparando normalizado)."""
+    result = list(existing or [])
+    seen = {normalize_identity(value) for value in result if normalize_identity(value)}
+    for value in new_values:
+        normalized = normalize_identity(value)
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            result.append(value)
+    return result
+
+
 def find_expert_records(names: list[str], role: str | None, db: Session) -> list[Expert]:
     identities = {normalize_identity(name) for name in names if normalize_identity(name)}
     if not identities:
@@ -81,7 +99,7 @@ def find_expert_records(names: list[str], role: str | None, db: Session) -> list
 
     normalized_role = normalize_identity(role)
     experts = db.scalars(select(Expert)).all()
-    matches = [expert for expert in experts if normalize_identity(expert.name) in identities]
+    matches = [expert for expert in experts if expert_identity_set(expert) & identities]
     matches_with_role = [expert for expert in matches if normalize_identity(expert.role) == normalized_role]
     matches_with_other_role = [expert for expert in matches if expert.id not in {item.id for item in matches_with_role}]
     return matches_with_role + matches_with_other_role
@@ -112,9 +130,17 @@ def ensure_expert_record(name: str, role: str, db: Session, aliases: list[str] |
     names = compact_identity_values(name, *(aliases or []))
     experts = find_expert_records(names, role, db)
     if experts:
-        return experts[0]
+        expert = experts[0]
+        # Acumular las identidades nuevas (p. ej. el id de Kinde) para que el
+        # experto se reconozca aunque cambie el metodo de login en el futuro.
+        merged_aliases = union_identity_values(expert.aliases, names)
+        if merged_aliases != list(expert.aliases or []):
+            expert.aliases = merged_aliases
+            db.commit()
+            db.refresh(expert)
+        return expert
 
-    expert = Expert(name=name, role=role)
+    expert = Expert(name=name, role=role, aliases=names)
     db.add(expert)
     db.commit()
     db.refresh(expert)
