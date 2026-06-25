@@ -31,8 +31,13 @@ function getLocalAnnotatedImageIds() {
 }
 
 function rememberLocalAnnotatedImageId(imageId: string) {
-  const nextIds = Array.from(new Set([...getLocalAnnotatedImageIds(), imageId]));
-  window.localStorage.setItem(localAnnotatedImagesKey, JSON.stringify(nextIds));
+  try {
+    const nextIds = Array.from(new Set([...getLocalAnnotatedImageIds(), imageId]));
+    window.localStorage.setItem(localAnnotatedImagesKey, JSON.stringify(nextIds));
+  } catch {
+    // Modo privado o storage lleno: no romper el guardado. La cola igual se
+    // protege en el backend al reconciliar al experto por id/alias.
+  }
 }
 
 export function ExpertJudgmentView({
@@ -41,7 +46,7 @@ export function ExpertJudgmentView({
   pendingImage = null,
   apiError = null,
 }: ExpertJudgmentViewProps) {
-  const [currentPendingImage, setCurrentPendingImage] = useState<ApiPendingImage | null>(null);
+  const [currentPendingImage, setCurrentPendingImage] = useState<ApiPendingImage | null>(pendingImage);
   const [selectedDeficiency, setSelectedDeficiency] = useState<Deficiency>("Magnesio (Mg)");
   const [severity, setSeverity] = useState<Severity>("Moderada");
   const [quality, setQuality] = useState<ImageQuality>("Alta");
@@ -60,7 +65,7 @@ export function ExpertJudgmentView({
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dragStart, setDragStart] = useState<{ pointerId: number; x: number; y: number; panX: number; panY: number } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [isLoadingImage, setIsLoadingImage] = useState(false);
+  const [isLoadingImage, setIsLoadingImage] = useState(!pendingImage && !apiError);
   const [message, setMessage] = useState<string | null>(null);
 
   const imageSrc = currentPendingImage?.preview_url;
@@ -95,8 +100,13 @@ export function ExpertJudgmentView({
   }, [expertAliases, expertName]);
 
   useEffect(() => {
-    setCurrentPendingImage(null);
-    void loadPendingImage();
+    const annotatedIds = getLocalAnnotatedImageIds();
+    // Evitar la doble consulta (y el parpadeo de la URL firmada) cuando el servidor ya trajo
+    // una imagen valida. Solo reconsultamos si no hay imagen o si la que vino ya fue anotada aqui.
+    if (!pendingImage || annotatedIds.includes(pendingImage.image_id)) {
+      void loadPendingImage();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadPendingImage]);
 
   useEffect(() => {
@@ -277,6 +287,14 @@ export function ExpertJudgmentView({
                     </button>
                   </div>
                 </>
+              ) : isLoadingImage ? (
+                <div className="flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 text-center md:min-h-[560px]">
+                  <ImageIcon className="h-12 w-12 animate-pulse text-slate-300" />
+                  <p className="mt-4 text-lg font-bold text-slate-950">Cargando cola de imágenes...</p>
+                  <p className="mt-2 max-w-md text-sm text-slate-500">
+                    Buscando la siguiente hoja pendiente de tu juicio experto.
+                  </p>
+                </div>
               ) : (
                 <div className="flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 text-center md:min-h-[560px]">
                   <ImageIcon className="h-12 w-12 text-slate-300" />

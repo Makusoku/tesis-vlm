@@ -9,8 +9,10 @@ export default async function ExpertJudgmentPage() {
   const { getUser } = getKindeServerSession();
   const kindeUser = await getUser();
   const fullName = [kindeUser?.given_name, kindeUser?.family_name].filter(Boolean).join(" ").trim();
-  const expertName = kindeUser?.email || kindeUser?.id || fullName || "Experto invitado";
-  const expertAliases = [fullName, kindeUser?.email, kindeUser?.id].filter(Boolean) as string[];
+  // Anclar la identidad al id estable de Kinde (no cambia si cambia el email/nombre).
+  // Evitar el comodin compartido "Experto invitado", que mezcla anotaciones de distintas personas.
+  const expertName = kindeUser?.id || kindeUser?.email || fullName || "Experto invitado";
+  const expertAliases = [kindeUser?.id, kindeUser?.email, fullName].filter(Boolean) as string[];
 
   try {
     const pendingImage = await fetchPendingImage(expertName, "Analista agronómico", expertAliases);
